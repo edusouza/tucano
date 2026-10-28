@@ -11,8 +11,9 @@ import { join } from 'node:path'
 import { L } from '../shared/lang'
 import { POINT, PICK, SNAPSHOT, TEXT } from '../shared/page'
 import type { BrowserOp, BrowserReply } from '../shared/types'
+import { chromePath, isWin } from './platform'
 
-export const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+export const CHROME = chromePath()
 
 const W = 1280
 const H = 800
@@ -147,9 +148,10 @@ class Tab {
         userAgentMetadata: {
           brands: [{ brand: 'Google Chrome', version }, { brand: 'Chromium', version }, { brand: 'Not(A:Brand', version: '24' }],
           fullVersion: /Chrome\/([\d.]+)/.exec(userAgent)?.[1] ?? version,
-          platform: 'macOS',
-          platformVersion: '15.0.0',
-          architecture: 'arm',
+          // The same system as the user agent string, or sites see a mismatch.
+          platform: isWin ? 'Windows' : 'macOS',
+          platformVersion: isWin ? '10.0.0' : '15.0.0',
+          architecture: isWin ? 'x86' : 'arm',
           model: '',
           mobile: false
         }

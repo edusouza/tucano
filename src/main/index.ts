@@ -9,6 +9,8 @@ import { bundleOf, moveFromAgentDesk, type Moved } from './migrate'
 
 const NAME = 'Tucano'
 app.setName(NAME)
+// Windows shows notifications only for an app with an id, the same as the installer's.
+if (process.platform === 'win32') app.setAppUserModelId('dev.tucano.app')
 
 // Until the core says which language the person picked, the Mac's.
 const systemLocale = ((): string | undefined => {
@@ -26,8 +28,9 @@ if (!app.isPackaged && !process.env['TUCANO_DATA']) app.setPath('userData', join
 
 // The data from when the app was called agent-desk comes over first (see migrate.ts). If it
 // can't yet, the app opens on a scratch folder only to say why, and the data stays put.
+// Only on the Mac: agent-desk never shipped for Windows, and the key lives in the macOS Keychain.
 const moved: Moved =
-  app.isPackaged && !process.env['TUCANO_DATA'] ? moveFromAgentDesk({ appData: app.getPath('appData'), dataDir: app.getPath('userData'), name: NAME, appPath: bundleOf(process.execPath) }) : 'nothing'
+  process.platform === 'darwin' && app.isPackaged && !process.env['TUCANO_DATA'] ? moveFromAgentDesk({ appData: app.getPath('appData'), dataDir: app.getPath('userData'), name: NAME, appPath: bundleOf(process.execPath) }) : 'nothing'
 if (moved === 'old-app-open' || moved === 'keychain-denied') app.setPath('userData', join(app.getPath('temp'), 'tucano-esperando'))
 
 const dataDir = (): string => process.env['TUCANO_DATA'] ?? app.getPath('userData')
@@ -76,10 +79,13 @@ ipcMain.on('viewing', (_e, id: unknown) => {
 // you, two notes when the work is done. Never more than one at a time.
 let chirpedAt = 0
 function chirp(sound: 'chama' | 'pronto'): void {
-  if (process.platform !== 'darwin' || Date.now() - chirpedAt < 1500) return
+  if ((process.platform !== 'darwin' && process.platform !== 'win32') || Date.now() - chirpedAt < 1500) return
   chirpedAt = Date.now()
   const dir = app.isPackaged ? join(process.resourcesPath, 'sounds') : join(app.getAppPath(), 'build/sounds')
-  execFile('afplay', ['-v', '0.7', join(dir, `tucano-${sound}.wav`)], () => {})
+  const file = join(dir, `tucano-${sound}.wav`)
+  if (process.platform === 'darwin') execFile('afplay', ['-v', '0.7', file], () => {})
+  // Windows has no afplay; .NET's SoundPlayer plays a .wav with nothing to install.
+  else execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `(New-Object Media.SoundPlayer '${file.replace(/'/g, "''")}').PlaySync()`], { windowsHide: true }, () => {})
 }
 
 // While an agent is replying, the Mac doesn't go to sleep on its own (closing the lid still does).
@@ -262,6 +268,18 @@ app.on('second-instance', () => showWindow())
 // The app's own menu, in the app's language (Electron's would be in English).
 function setMenu(): void {
   app.setAboutPanelOptions({ applicationName: NAME, applicationVersion: app.getVersion() })
+  // Windows has no app menu (services, hide others): the File menu holds quit, as Windows apps do.
+  if (process.platform !== 'darwin') {
+    Menu.setApplicationMenu(
+      Menu.buildFromTemplate([
+        { label: L('Arquivo', 'File'), submenu: [{ role: 'about', label: L(`Sobre o ${NAME}`, `About ${NAME}`) }, { type: 'separator' }, { role: 'quit', label: L('Sair', 'Exit') }] },
+        { role: 'editMenu', label: L('Editar', 'Edit') },
+        { role: 'viewMenu', label: L('Visualizar', 'View') },
+        { role: 'windowMenu', label: L('Janela', 'Window') }
+      ])
+    )
+    return
+  }
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
       {

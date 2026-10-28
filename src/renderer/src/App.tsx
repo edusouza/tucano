@@ -10,6 +10,7 @@ import { SkillsPage } from './components/Skills'
 import { ReportPage } from './components/Report'
 import { Onboarding } from './components/Onboarding'
 import { Dialogs } from './components/Dialogs'
+import { modDown } from '../../shared/os'
 
 export function App(): ReactNode {
   const view = useStore((s) => s.view)
@@ -26,10 +27,10 @@ export function App(): ReactNode {
     else document.documentElement.dataset['theme'] = theme
   }, [theme])
 
-  // ⌘K go anywhere · ⌘N new channel · ⌘1–9 the channels in order · ⌘, settings
+  // ⌘K go anywhere · ⌘N new channel · ⌘1–9 the channels in order · ⌘, settings (Ctrl on Windows)
   useEffect(() => {
     const keys = (e: KeyboardEvent): void => {
-      if (!e.metaKey || e.ctrlKey || e.altKey || intro) return
+      if (!modDown(e) || e.altKey || intro) return
       const s = getState()
       const channels = s.conversations.filter((c) => c.kind === 'channel')
       if (e.key === 'k') openDialog(s.dialog?.kind === 'search' ? null : { kind: 'search' })

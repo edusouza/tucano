@@ -3,12 +3,14 @@ import { access, constants } from 'node:fs/promises'
 import { join } from 'node:path'
 import { L } from '../../shared/lang'
 import type { EngineId, EngineStatus } from '../../shared/types'
+import { executableNames, isWin, pathDirs, spawnable } from '../platform'
 import { userProvider } from './claude'
 import { codexEnv, userCodexProvider } from './codex'
 
 function run(bin: string, args: string[], timeout = 15_000, env: NodeJS.ProcessEnv = process.env): Promise<{ code: number; stdout: string; stderr: string }> {
   return new Promise((resolve) => {
-    execFile(bin, args, { timeout, env }, (err, stdout, stderr) => {
+    const s = spawnable(bin, args)
+    execFile(s.file, s.args, { timeout, env, windowsHide: true, windowsVerbatimArguments: s.verbatim }, (err, stdout, stderr) => {
       const code = err ? (typeof err.code === 'number' ? err.code : 1) : 0
       resolve({ code, stdout: String(stdout), stderr: String(stderr) })
     })
@@ -17,7 +19,9 @@ function run(bin: string, args: string[], timeout = 15_000, env: NodeJS.ProcessE
 
 // Apps opened from Finder get a minimal PATH. Borrow the one from the user's
 // login shell so `claude` and `codex` are found where the terminal finds them.
+// Windows hands every app the user's full PATH already.
 export async function adoptLoginShellPath(): Promise<void> {
+  if (isWin) return
   const shell = process.env['SHELL'] || '/bin/zsh'
   const { code, stdout } = await run(shell, ['-ilc', 'printf "__PATH__%s" "$PATH"'], 10_000)
   const path = stdout.split('__PATH__').pop()?.trim()
@@ -25,14 +29,15 @@ export async function adoptLoginShellPath(): Promise<void> {
 }
 
 async function which(cmd: string): Promise<string | undefined> {
-  for (const dir of (process.env['PATH'] ?? '').split(':')) {
-    if (!dir) continue
-    const p = join(dir, cmd)
-    try {
-      await access(p, constants.X_OK)
-      return p
-    } catch {
-      // not here
+  for (const dir of pathDirs()) {
+    for (const name of executableNames(cmd)) {
+      const p = join(dir, name)
+      try {
+        await access(p, constants.X_OK)
+        return p
+      } catch {
+        // not here
+      }
     }
   }
   return undefined

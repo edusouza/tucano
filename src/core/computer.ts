@@ -9,11 +9,13 @@ import { homedir } from 'node:os'
 import { basename, dirname, extname, join, posix, sep } from 'node:path'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import { L } from '../shared/lang'
+import { MACHINE } from '../shared/os'
 import type { CoreEvent } from '../shared/rpc'
 import { PROJECTS_DIR, type Agent, type Artifact, type ArtifactKind, type ComputerInfo, type LentFolder, type Service } from '../shared/types'
 import type { Db } from './db'
 import { textResult, type ToolDef } from './gateway'
 import { MacComputer, macTools } from './mac'
+import { isWin } from './platform'
 
 export const IMAGE = 'node:22-bookworm'
 // Containers of another data directory (tests, a second install) never collide.
@@ -39,7 +41,8 @@ export function checkFolder(path: string, opts: { home?: string; dataDir: string
   const home = realpathSync(opts.home ?? homedir())
   if (!real.startsWith(home + sep)) return L('Só dá pra usar pastas dentro da sua pasta de usuário.', 'Only folders inside your home folder can be used.')
   const top = real.slice(home.length + 1).split(sep)[0]!
-  if (top === 'Library' || top.startsWith('.')) return L('Essa pasta guarda configurações e credenciais do Mac; não dá pra usar.', "That folder holds the Mac's settings and credentials; it can't be used.")
+  // Library on the Mac, AppData on Windows: settings, caches and credentials of every app.
+  if (top === 'Library' || top.toLowerCase() === 'appdata' || top.startsWith('.')) return L(`Essa pasta guarda configurações e credenciais do ${MACHINE}; não dá pra usar.`, `That folder holds the ${MACHINE}'s settings and credentials; it can't be used.`)
   const data = existsSync(opts.dataDir) ? realpathSync(opts.dataDir) : opts.dataDir
   if (data === real || data.startsWith(real + sep) || real.startsWith(data + sep)) return L('Essa pasta tem os dados do próprio Tucano; não dá pra usar.', "That folder holds Tucano's own data; it can't be used.")
   return null
@@ -283,7 +286,7 @@ export function hostUrl(url: string, ports: Record<number, number>): string | { 
   if (!['localhost', '127.0.0.1', '0.0.0.0'].includes(u.hostname)) return u.toString()
   const port = Number(u.port || (u.protocol === 'https:' ? 443 : 80))
   const host = ports[port]
-  if (!host) return { error: L(`A porta ${port} do seu computador não está aberta pro Mac. Use uma destas: ${PORTS.join(', ')}.`, `Port ${port} of your computer isn't open to the Mac. Use one of these: ${PORTS.join(', ')}.`) }
+  if (!host) return { error: L(`A porta ${port} do seu computador não está aberta pro ${MACHINE}. Use uma destas: ${PORTS.join(', ')}.`, `Port ${port} of your computer isn't open to the ${MACHINE}. Use one of these: ${PORTS.join(', ')}.`) }
   u.hostname = '127.0.0.1'
   u.port = String(host)
   return u.toString()
@@ -448,7 +451,7 @@ export class Computers {
     }
     if (/daemon|connect to the docker/i.test(state.stderr)) {
       this.set(agentId, { state: 'no_docker', detail: noDocker() })
-      throw new Error(L('O Docker não está rodando no Mac. Peça pro usuário abrir o Docker Desktop.', "Docker isn't running on the Mac. Ask the user to open Docker Desktop."))
+      throw new Error(L(`O Docker não está rodando no ${MACHINE}. Peça pro usuário abrir o Docker Desktop.`, `Docker isn't running on the ${MACHINE}. Ask the user to open Docker Desktop.`))
     }
 
     if (state.code === 0) {
@@ -608,7 +611,7 @@ export class Computers {
     const port = Number(args['port'])
     if (!/^[a-z0-9][a-z0-9_-]{0,31}$/i.test(name)) return { result: textResult(badName(), true) }
     if (!command) return { result: textResult(L('Faltou o comando.', 'Missing the command.'), true) }
-    if (!PORTS.includes(port)) return { result: textResult(L(`Porta ${port} não está aberta pro Mac. Use uma destas: ${PORTS.join(', ')}.`, `Port ${port} isn't open to the Mac. Use one of these: ${PORTS.join(', ')}.`), true) }
+    if (!PORTS.includes(port)) return { result: textResult(L(`Porta ${port} não está aberta pro ${MACHINE}. Use uma destas: ${PORTS.join(', ')}.`, `Port ${port} isn't open to the ${MACHINE}. Use one of these: ${PORTS.join(', ')}.`), true) }
     const taken = this.deps.db.services(agentId).find((s) => s.port === port && s.name !== name)
     if (taken) return { result: textResult(portTaken(port, taken.name), true) }
 
@@ -642,7 +645,7 @@ export class Computers {
 
     if (!alive) return { result: textResult(withLog(diedAtStart()), true) }
     if (where === 'loopback')
-      return { result: textResult(withLog(L('Está rodando, mas escuta só em localhost, então o Mac não alcança. Reinicie escutando em 0.0.0.0 (ex.: --host 0.0.0.0).', "It's running, but listens only on localhost, so the Mac can't reach it. Restart it listening on 0.0.0.0 (e.g. --host 0.0.0.0).")), true), service: name }
+      return { result: textResult(withLog(L(`Está rodando, mas escuta só em localhost, então o ${MACHINE} não alcança. Reinicie escutando em 0.0.0.0 (ex.: --host 0.0.0.0).`, `It's running, but listens only on localhost, so the ${MACHINE} can't reach it. Restart it listening on 0.0.0.0 (e.g. --host 0.0.0.0).`)), true), service: name }
     if (!where) return { result: textResult(withLog(notOpenYet(port))), service: name }
     return {
       result: textResult(withLog(
@@ -702,8 +705,15 @@ export class Computers {
     const dir = join(this.deps.dataDir, 'artifacts', id)
     mkdirSync(dir, { recursive: true })
     if (file.containerPath) {
-      // `docker cp -L` resolves links inside the container and writes a plain file here.
-      const r = await docker(['cp', '-L', `${this.name(agentId)}:${file.containerPath}`, join(dir, name)], { timeoutMs: 120_000 })
+      // `docker cp -L` resolves links inside the container and writes a plain file here. Docker's
+      // Windows CLI resolves an absolute link target (/etc/hostname) against the link's folder,
+      // so there the path is resolved first, inside the container, and copied as a plain file.
+      let from = file.containerPath
+      if (isWin) {
+        const real = await docker(['exec', this.name(agentId), 'readlink', '-f', '--', from], { timeoutMs: 15_000 })
+        if (real.code === 0 && real.stdout.trim()) from = real.stdout.trim()
+      }
+      const r = await docker(['cp', '-L', `${this.name(agentId)}:${from}`, join(dir, name)], { timeoutMs: 120_000 })
       if (r.code !== 0) {
         rmSync(dir, { recursive: true, force: true })
         return { error: r.stderr.trim() || L(`Não achei ${file.containerPath}.`, `I couldn't find ${file.containerPath}.`) }

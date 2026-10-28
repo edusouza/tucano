@@ -6,6 +6,7 @@ import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import { L, locale } from '../shared/lang'
+import { MACHINE } from '../shared/os'
 import { describeSchedule, modelInfo, type Agent, type AgentColor, type Effort, type GrantLevel, type Routine, type Schedule, type Trigger } from '../shared/types'
 import type { Db } from './db'
 
@@ -75,8 +76,8 @@ export function exportTeam(db: Db): string {
     L('# Time do Tucano', '# Tucano team'),
     '',
     L(
-      `Exportado em ${new Date().toLocaleString(locale())}. Sem credenciais, memórias nem conversas. Pra usar em outro Mac: Configurações → Time → Importar.`,
-      `Exported on ${new Date().toLocaleString(locale())}. No credentials, memories or conversations. To use it on another Mac: Settings → Team → Import.`
+      `Exportado em ${new Date().toLocaleString(locale())}. Sem credenciais, memórias nem conversas. Pra usar em outro computador: Configurações → Time → Importar.`,
+      `Exported on ${new Date().toLocaleString(locale())}. No credentials, memories or conversations. To use it on another computer: Settings → Team → Import.`
     ),
     '',
     L('## Agentes', '## Agents'),
@@ -92,7 +93,7 @@ export function exportTeam(db: Db): string {
           L('## Rotinas', '## Routines'),
           ...data.routines.map(
             (r) =>
-              `- **${r.name}** (@${r.agent}, ${r.where === 'dm' ? L('na DM', 'in the DM') : r.where}): ${r.trigger ? (r.trigger.kind === 'poll' ? L(`quando aparece algo novo em ${r.trigger.connector} · ${r.trigger.tool}`, `when something new shows up in ${r.trigger.connector} · ${r.trigger.tool}`) : L('quando chamada no Mac', 'when called on the Mac')) : describeSchedule(r.schedule)}`
+              `- **${r.name}** (@${r.agent}, ${r.where === 'dm' ? L('na DM', 'in the DM') : r.where}): ${r.trigger ? (r.trigger.kind === 'poll' ? L(`quando aparece algo novo em ${r.trigger.connector} · ${r.trigger.tool}`, `when something new shows up in ${r.trigger.connector} · ${r.trigger.tool}`) : L(`quando chamada no ${MACHINE}`, `when called on the ${MACHINE}`)) : describeSchedule(r.schedule)}`
           ),
           ''
         ]

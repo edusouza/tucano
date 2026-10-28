@@ -4,7 +4,7 @@ Thanks for wanting to help. Tucano is a small codebase on purpose: an Electron a
 
 ## Setup
 
-You need macOS on Apple silicon, Node 24 or later, and at least one harness signed in (`claude auth login` is the quickest).
+You need macOS on Apple silicon, Node 24 or later, and at least one harness signed in (`claude auth login` is the quickest). Windows 10/11 works too, with Git for Windows installed: see [docs/windows.md](docs/windows.md).
 
 ```bash
 git clone https://github.com/eduwxyz/tucano.git
@@ -13,7 +13,7 @@ npm install
 npm run dev
 ```
 
-`npm run dev` opens the app with hot reload, on its own data folder (`~/Library/Application Support/Tucano Dev`), so it never touches an installed Tucano.
+`npm run dev` opens the app with hot reload, on its own data folder (`~/Library/Application Support/Tucano Dev`, or `%APPDATA%\Tucano Dev` on Windows), so it never touches an installed Tucano.
 
 Handy environment variables:
 
@@ -57,6 +57,7 @@ No agent work runs in the window or the main process: everything goes through th
 
 - **Language.** Code, comments, commit messages and pull requests are in English. The app speaks Portuguese and English: every string a person reads is written once in each, side by side, with `L('Português', 'English')` from `src/shared/lang.ts`. Don't put translated text in module-level constants (they're evaluated before the language is known): build it where it's used.
 - **Comments** say why, not what, in plain sentences.
+- **macOS and Windows.** What differs between them lives in `src/core/platform.ts` (finding and spawning CLIs, the agents' shell, stopping process trees) and `src/shared/os.ts` (shortcuts, "Mac" or "PC"). Use `path.join`/`dirname` for file paths, never `'/'` string handling, and run commands through `spawnable`/`shellCommand` rather than spawning `/bin/bash` or a bare `.cmd`.
 - **Small and direct.** Prefer the simple version that works over infrastructure for cases that don't exist yet. New dependencies need a reason.
 - **Commits** are small and focused, with a message in the imperative ("Add …", "Fix …").
 

@@ -3,6 +3,7 @@
 // providers they have logins for. Here they pick which ones the agents use,
 // test them, and pick models from what each harness offers.
 import { L } from '../../../shared/lang'
+import { onWindows } from '../../../shared/os'
 import { useEffect, useState, type ReactNode } from 'react'
 import {
   ENGINES,
@@ -205,14 +206,14 @@ function HarnessRow({ engine, st, picked, toggle }: { engine: EngineId; st: Engi
           </button>
         )}
         {st.installed && !st.loggedIn && !st.soon && (
-          <button className="btn btn--sm btn--primary" title={L(`Abre o Terminal com: ${ENGINES[engine].login}`, `Opens Terminal with: ${ENGINES[engine].login}`)} onClick={() => loginEngine(engine)}>
+          <button className="btn btn--sm btn--primary" title={onWindows ? L(`Abre uma janela de console com: ${ENGINES[engine].login}`, `Opens a console window with: ${ENGINES[engine].login}`) : L(`Abre o Terminal com: ${ENGINES[engine].login}`, `Opens Terminal with: ${ENGINES[engine].login}`)} onClick={() => loginEngine(engine)}>
             {L('Entrar', 'Sign in')}
           </button>
         )}
       </div>
       {!st.installed && (
         <div className="harness__body">
-          <span className="hint">{L('Pra instalar, cole no Terminal:', 'To install, paste in Terminal:')}</span>
+          <span className="hint">{onWindows ? L('Pra instalar, cole no PowerShell:', 'To install, paste in PowerShell:') : L('Pra instalar, cole no Terminal:', 'To install, paste in Terminal:')}</span>
           <code className="harness__cmd">{ENGINES[engine].install}</code>
         </div>
       )}

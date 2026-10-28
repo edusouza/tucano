@@ -1,4 +1,5 @@
 import { L } from '../../../shared/lang'
+import { MACHINE } from '../../../shared/os'
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -217,8 +218,8 @@ function MessageRow({ message, grouped }: { message: Message; grouped: boolean }
               <span className="msg__author">{name}</span>
             )}
             {agent?.computer && agent.computerKind === 'mac' && (
-              <span className="tag tag--warn" title={L('Os comandos deste agente rodam direto no seu Mac', 'This agent’s commands run right on your Mac')}>
-                {L('no seu Mac', 'on your Mac')}
+              <span className="tag tag--warn" title={L(`Os comandos deste agente rodam direto no seu ${MACHINE}`, `This agent’s commands run right on your ${MACHINE}`)}>
+                {L(`no seu ${MACHINE}`, `on your ${MACHINE}`)}
               </span>
             )}
             <span className="msg__time">{time(message.at)}</span>

@@ -11,10 +11,12 @@ import { homedir } from 'node:os'
 import { basename, dirname, isAbsolute, join, normalize } from 'node:path'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import { L } from '../shared/lang'
+import { MACHINE } from '../shared/os'
 import type { CoreEvent } from '../shared/rpc'
 import type { Agent, Artifact, ComputerInfo, Service } from '../shared/types'
 import type { Db } from './db'
 import { textResult, type ToolDef } from './gateway'
+import { isWin, killTree, shellCommand } from './platform'
 import { artifactKind, badName, edited, manyMatches, clipOutput, diedAtStart, emptyOld, fileText, formatExec, isBinary, linuxTools, noService, noShots, notInFile, notOpenYet, portTaken, seenImage, shown, tooBig, type Shooter, type ToolOutcome } from './computer'
 
 const MAX_FILE = 200_000
@@ -22,23 +24,33 @@ const MAX_SHOW_BYTES = 50 * 1024 * 1024
 const RESERVED_PORTS = [47_717, 47_718] // the app's own webhook and git proxy
 
 const macDescriptions = (): Record<string, string> => ({
-  bash: L(
-    'Roda um comando no Mac do usuário (macOS, como o próprio usuário, com o que ele tem instalado: Homebrew, Python, Node…), por padrão na sua pasta de trabalho. Pra servidores que ficam rodando, use start_service.',
-    "Runs a command on the user's Mac (macOS, as the user, with what they have installed: Homebrew, Python, Node…), by default in your working folder. For servers that keep running, use start_service."
-  ),
-  read_file: L('Lê um arquivo de texto do Mac.', 'Reads a text file from the Mac.'),
-  write_file: L('Cria ou sobrescreve um arquivo no Mac, criando as pastas que faltarem.', 'Creates or overwrites a file on the Mac, creating any missing folders.'),
+  bash: isWin
+    ? shellCommand('').kind === 'bash'
+      ? L(
+          'Roda um comando no PC Windows do usuário, no Git Bash (sintaxe bash; caminhos como /c/Users/... ou C:/Users/...), como o próprio usuário, com o que ele tem instalado (Python, Node, git…), por padrão na sua pasta de trabalho. Pra servidores que ficam rodando, use start_service.',
+          "Runs a command on the user's Windows PC, in Git Bash (bash syntax; paths like /c/Users/... or C:/Users/...), as the user, with what they have installed (Python, Node, git…), by default in your working folder. For servers that keep running, use start_service."
+        )
+      : L(
+          'Roda um comando no PC Windows do usuário, no cmd.exe (sintaxe do cmd, não bash), como o próprio usuário, com o que ele tem instalado, por padrão na sua pasta de trabalho. Pra servidores que ficam rodando, use start_service.',
+          "Runs a command on the user's Windows PC, in cmd.exe (cmd syntax, not bash), as the user, with what they have installed, by default in your working folder. For servers that keep running, use start_service."
+        )
+    : L(
+        'Roda um comando no Mac do usuário (macOS, como o próprio usuário, com o que ele tem instalado: Homebrew, Python, Node…), por padrão na sua pasta de trabalho. Pra servidores que ficam rodando, use start_service.',
+        "Runs a command on the user's Mac (macOS, as the user, with what they have installed: Homebrew, Python, Node…), by default in your working folder. For servers that keep running, use start_service."
+      ),
+  read_file: L(`Lê um arquivo de texto do ${MACHINE}.`, `Reads a text file from the ${MACHINE}.`),
+  write_file: L(`Cria ou sobrescreve um arquivo no ${MACHINE}, criando as pastas que faltarem.`, `Creates or overwrites a file on the ${MACHINE}, creating any missing folders.`),
   start_service: L(
-    'Deixa um processo rodando em segundo plano no Mac (servidor web, API, dashboard) e confere se ele abriu a porta (qualquer porta acima de 1024 que esteja livre). O log fica na pasta de trabalho, em .logs/<nome>.log. Iniciar de novo com o mesmo nome reinicia.',
-    'Leaves a process running in the background on the Mac (web server, API, dashboard) and checks that it opened the port (any free port above 1024). The log goes to the working folder, in .logs/<name>.log. Starting again with the same name restarts it.'
+    `Deixa um processo rodando em segundo plano no ${MACHINE} (servidor web, API, dashboard) e confere se ele abriu a porta (qualquer porta acima de 1024 que esteja livre). O log fica na pasta de trabalho, em .logs/<nome>.log. Iniciar de novo com o mesmo nome reinicia.`,
+    `Leaves a process running in the background on the ${MACHINE} (web server, API, dashboard) and checks that it opened the port (any free port above 1024). The log goes to the working folder, in .logs/<name>.log. Starting again with the same name restarts it.`
   ),
   screenshot: L(
-    'Tira um print de uma página web e mostra no chat; você também recebe a imagem. Serve http://localhost:<porta> (o Mac) ou qualquer URL da internet.',
-    'Takes a screenshot of a web page and shows it in the chat; you get the image too. Works with http://localhost:<port> (the Mac) or any URL on the internet.'
+    `Tira um print de uma página web e mostra no chat; você também recebe a imagem. Serve http://localhost:<porta> (o ${MACHINE}) ou qualquer URL da internet.`,
+    `Takes a screenshot of a web page and shows it in the chat; you get the image too. Works with http://localhost:<port> (the ${MACHINE}) or any URL on the internet.`
   ),
   show_file: L(
-    'Mostra um arquivo do Mac no chat: imagem, vídeo, Markdown, HTML, PDF, CSV ou texto (até 50 MB). O arquivo é guardado como está agora. Se for imagem, você também a recebe pra conferir.',
-    'Shows a file from the Mac in the chat: image, video, Markdown, HTML, PDF, CSV or text (up to 50 MB). The file is kept as it is now. If it is an image, you get it too, to check.'
+    `Mostra um arquivo do ${MACHINE} no chat: imagem, vídeo, Markdown, HTML, PDF, CSV ou texto (até 50 MB). O arquivo é guardado como está agora. Se for imagem, você também a recebe pra conferir.`,
+    `Shows a file from the ${MACHINE} in the chat: image, video, Markdown, HTML, PDF, CSV or text (up to 50 MB). The file is kept as it is now. If it is an image, you get it too, to check.`
   )
 })
 
@@ -65,7 +77,7 @@ export const macTools = (): ToolDef[] => {
 // A path as the agent writes it, on the Mac.
 export function macPath(p: string, cwd: string): string {
   const s = p.trim()
-  if (s === '~' || s.startsWith('~/')) return normalize(join(homedir(), s.slice(1)))
+  if (s === '~' || s.startsWith('~/') || (isWin && s.startsWith('~\\'))) return normalize(join(homedir(), s.slice(1)))
   return normalize(isAbsolute(s) ? s : join(cwd, s))
 }
 
@@ -76,6 +88,9 @@ type Exec = { code: number; stdout: string; stderr: string }
 // nothing of the app's process goes along.
 let envOnce: Promise<NodeJS.ProcessEnv> | undefined
 export function loginEnv(): Promise<NodeJS.ProcessEnv> {
+  // Windows has no login shell to ask: every app already gets the user's full
+  // environment (PATH included, spelled Path there). What the app itself added stays out.
+  if (isWin) envOnce ??= Promise.resolve({ HOME: homedir(), ...Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(TUCANO_|ELECTRON_|VITE_)/i.test(k) && k !== 'NODE_OPTIONS')) })
   envOnce ??= new Promise((resolve) => {
     const base: NodeJS.ProcessEnv = {
       HOME: homedir(),
@@ -110,22 +125,20 @@ export function loginEnv(): Promise<NodeJS.ProcessEnv> {
 function run(command: string, opts: { cwd: string; env: NodeJS.ProcessEnv; timeoutSeconds: number; signal?: AbortSignal }): Promise<Exec> {
   return new Promise((resolve) => {
     // Its own process group, so a timeout or a stop takes the children with it.
-    const child = spawn('/bin/bash', ['-c', command], { cwd: opts.cwd, env: { ...opts.env, TERM: 'dumb' }, detached: true, stdio: ['ignore', 'pipe', 'pipe'] })
+    // (On Windows, detached would open a console window; taskkill finds the tree anyway.)
+    const sh = shellCommand(command, { ...opts.env, TERM: 'dumb' })
+    const child = spawn(sh.file, sh.args, { cwd: opts.cwd, env: sh.env, detached: !isWin, windowsHide: true, windowsVerbatimArguments: sh.verbatim, stdio: ['ignore', 'pipe', 'pipe'] })
     let stdout = ''
     let stderr = ''
     let timedOut = false
     child.stdout.setEncoding('utf8').on('data', (d: string) => (stdout = (stdout + d).slice(-2_000_000)))
     child.stderr.setEncoding('utf8').on('data', (d: string) => (stderr = (stderr + d).slice(-200_000)))
     const killGroup = (sig: NodeJS.Signals): void => {
-      try {
-        if (child.pid) process.kill(-child.pid, sig)
-      } catch {
-        /* already gone */
-      }
+      if (child.pid) killTree(child.pid, sig)
     }
     const stop = (): void => {
       killGroup('SIGTERM')
-      setTimeout(() => killGroup('SIGKILL'), 5000).unref()
+      if (!isWin) setTimeout(() => killGroup('SIGKILL'), 5000).unref() // taskkill is already forceful
     }
     const timer = setTimeout(() => ((timedOut = true), stop()), opts.timeoutSeconds * 1000)
     opts.signal?.addEventListener('abort', stop, { once: true })
@@ -213,18 +226,15 @@ export class MacComputer {
     const pid = this.pid(agentId, name)
     let stopped = true
     if (pid && alive(pid)) {
-      try {
-        process.kill(-pid, 'SIGTERM')
-      } catch {
-        stopped = false
-      }
-      for (let i = 0; i < 6 && alive(pid); i++) await new Promise((r) => setTimeout(r, 500))
-      if (alive(pid))
+      if (isWin) killTree(pid)
+      else
         try {
-          process.kill(-pid, 'SIGKILL')
+          process.kill(-pid, 'SIGTERM')
         } catch {
-          /* gone */
+          stopped = false
         }
+      for (let i = 0; i < 6 && alive(pid); i++) await new Promise((r) => setTimeout(r, 500))
+      if (alive(pid)) killTree(pid, 'SIGKILL')
     }
     rmSync(this.pidFile(agentId, name), { force: true })
     this.deps.db.removeServices(agentId, name)
@@ -257,14 +267,15 @@ export class MacComputer {
     const taken = this.deps.db.services(agent.id).find((s) => s.port === port && s.name !== name)
     if (taken) return { result: textResult(portTaken(port, taken.name), true) }
     if (this.deps.db.services(agent.id).some((s) => s.name === name)) await this.stopService(agent.id, name)
-    if (await portOpen(port)) return { result: textResult(L(`A porta ${port} já está em uso no Mac por outro programa. Use outra.`, `Port ${port} is already in use on the Mac by another program. Use another.`), true) }
+    if (await portOpen(port)) return { result: textResult(L(`A porta ${port} já está em uso no ${MACHINE} por outro programa. Use outra.`, `Port ${port} is already in use on the ${MACHINE} by another program. Use another.`), true) }
 
     const logs = join(this.folder(agent.id), '.logs')
     mkdirSync(logs, { recursive: true })
     mkdirSync(dirname(this.pidFile(agent.id, name)), { recursive: true })
     const log = join(logs, `${name}.log`)
     const fd = openSync(log, 'w')
-    const child = spawn('/bin/bash', ['-c', command], { cwd, env: { ...(await this.env()), TERM: 'dumb' }, detached: true, stdio: ['ignore', fd, fd] })
+    const sh = shellCommand(command, { ...(await this.env()), TERM: 'dumb' })
+    const child = spawn(sh.file, sh.args, { cwd, env: sh.env, detached: !isWin, windowsHide: true, windowsVerbatimArguments: sh.verbatim, stdio: ['ignore', fd, fd] })
     closeSync(fd)
     child.unref()
     if (!child.pid) return { result: textResult(L('Não consegui iniciar o processo.', "I couldn't start the process."), true) }
@@ -279,7 +290,7 @@ export class MacComputer {
     this.refresh(agent)
     let tail = ''
     try {
-      tail = readFileSync(log, 'utf8').split('\n').slice(-30).join('\n').trim()
+      tail = readFileSync(log, 'utf8').split(/\r?\n/).slice(-30).join('\n').trim()
     } catch {
       /* no log */
     }

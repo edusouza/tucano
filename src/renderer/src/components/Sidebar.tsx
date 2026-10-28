@@ -1,4 +1,5 @@
 import { L } from '../../../shared/lang'
+import { MACHINE, mod } from '../../../shared/os'
 import { useCallback, useState, type ReactNode } from 'react'
 import {
   agentById,
@@ -140,7 +141,7 @@ export function Sidebar(): ReactNode {
         <div className="section">
           <div className="section__head">
             <span>{L('Canais', 'Channels')}</span>
-            <button className="icon-btn icon-btn--sm" title={L('Novo canal (⌘N)', 'New channel (⌘N)')} onClick={() => openDialog({ kind: 'new-channel' })}>
+            <button className="icon-btn icon-btn--sm" title={L(`Novo canal (${mod}N)`, `New channel (${mod}N)`)} onClick={() => openDialog({ kind: 'new-channel' })}>
               <Icon name="plus" size={14} />
             </button>
           </div>
@@ -238,7 +239,7 @@ function AgentItem({ id }: { id: string }): ReactNode {
       <span className="nav-item__label">{agent.name}</span>
       {working ? <span className="pulse" title={L('Trabalhando', 'Working')} /> : <span className="nav-item__meta">{agent.role}</span>}
       {agent.computer && agent.computerKind === 'mac' && (
-        <span className="nav-item__mac" title={L('Roda no seu Mac', 'Runs on your Mac')}>
+        <span className="nav-item__mac" title={L(`Roda no seu ${MACHINE}`, `Runs on your ${MACHINE}`)}>
           <Icon name="laptop" size={13} />
         </span>
       )}

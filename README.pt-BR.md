@@ -208,6 +208,9 @@ Precisa do Node 24+ e de um harness logado. O `npm run dev` guarda os dados em `
 | `npm run install-app` | Gera o `Tucano.app` e instala em `/Applications` |
 | `npm run release` | Gera o `.dmg` e o `.zip` e publica a versão do `package.json` como release no GitHub (`-- --no-publish` só gera) |
 | `node scripts/screens.mjs <pasta>` | Abre o build com Playwright num banco temporário e salva screenshots |
+| `npm run dist:win` | No Windows: gera o instalador, `dist/tucano-win-x64.exe` (sem assinatura de código) |
+
+**No Windows?** O Tucano roda no Windows 10/11 também, em desenvolvimento e como instalador. Você vai querer também o Git for Windows, cujo Git Bash roda os comandos dos agentes no seu PC. O [docs/windows.md](docs/windows.md) (em inglês) diz o que precisa, o que muda em relação ao Mac e todas as mudanças feitas pra isso.
 
 Leia o [CONTRIBUTING.md](CONTRIBUTING.md) antes de abrir um pull request (o código, os comentários e os commits são em inglês). O documento de design original está em [docs/spec-mvp.md](docs/spec-mvp.md).
 

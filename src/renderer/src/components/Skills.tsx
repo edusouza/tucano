@@ -1,6 +1,7 @@
 // Skills (spec §18): recipes the agents follow, kept like pages to read. Agents
 // propose; I approve, edit, and undo any change from the history.
 import { L } from '../../../shared/lang'
+import { MACHINE } from '../../../shared/os'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -325,7 +326,7 @@ function AddFromTerminal({ onClose }: { onClose: () => void }): ReactNode {
             </button>
             <h3>{picked.name}</h3>
             <p>{picked.description}</p>
-            {picked.scripts && <p className="warn-text small">{L('Tem scripts: só roda com um agente que tenha computador (Linux ou este Mac).', 'It has scripts: it only runs with an agent that has a computer (Linux or this Mac).')}</p>}
+            {picked.scripts && <p className="warn-text small">{L(`Tem scripts: só roda com um agente que tenha computador (Linux ou este ${MACHINE}).`, `It has scripts: it only runs with an agent that has a computer (Linux or this ${MACHINE}).`)}</p>}
             <span className="skill-add__label">{L('Quem usa?', 'Who uses it?')}</span>
             <AgentPicker value={agents} onChange={setAgents} />
             {error && <p className="note note--error">{error}</p>}

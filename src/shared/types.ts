@@ -1,5 +1,6 @@
 // Domain types shared by the core (utility process) and the renderer.
 import { L, lang, type Lang } from './lang'
+import { onWindows } from './os'
 
 export type AgentColor = 'sky' | 'indigo' | 'violet' | 'rose' | 'amber' | 'green' | 'teal' | 'graphite'
 export type GrantLevel = 'none' | 'read' | 'read_write'
@@ -265,9 +266,9 @@ export const countedTokens = (u: { inputTokens: number; cacheReadTokens: number;
   Math.round(u.inputTokens - u.cacheReadTokens * (1 - CACHE_READ_WEIGHT) + u.outputTokens)
 
 export const ENGINES: Record<EngineId, { label: string; cli: string; login: string; install: string; site: string }> = {
-  claude: { label: 'Claude Code', cli: 'claude', login: 'claude auth login', install: 'curl -fsSL https://claude.ai/install.sh | bash', site: 'https://code.claude.com' },
+  claude: { label: 'Claude Code', cli: 'claude', login: 'claude auth login', install: onWindows ? 'irm https://claude.ai/install.ps1 | iex' : 'curl -fsSL https://claude.ai/install.sh | bash', site: 'https://code.claude.com' },
   codex: { label: 'Codex', cli: 'codex', login: 'codex login', install: 'npm install -g @openai/codex', site: 'https://github.com/openai/codex' },
-  opencode: { label: 'OpenCode', cli: 'opencode', login: 'opencode auth login', install: 'curl -fsSL https://opencode.ai/install | bash', site: 'https://opencode.ai' },
+  opencode: { label: 'OpenCode', cli: 'opencode', login: 'opencode auth login', install: onWindows ? 'npm install -g opencode-ai' : 'curl -fsSL https://opencode.ai/install | bash', site: 'https://opencode.ai' },
   pi: { label: 'Pi', cli: 'pi', login: 'pi', install: 'npm install -g @earendil-works/pi-coding-agent', site: 'https://pi.dev' }
 }
 export const ENGINE_IDS = Object.keys(ENGINES) as EngineId[]
