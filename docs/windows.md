@@ -42,7 +42,7 @@ This builds `dist\tucano-win-x64.exe`, a one-click per-user NSIS installer, with
 | | macOS | Windows |
 |---|---|---|
 | Finding harness CLIs | The login shell's `PATH` (apps opened from Finder get a minimal one) | The process `PATH` as is (Windows gives every app the full one), trying each `PATHEXT` extension: `claude.exe`, `codex.cmd`… |
-| Running a CLI | Spawned directly | `.exe` spawned directly; npm's `.cmd` shims through `cmd.exe`, with every argument escaped for it (Node refuses to spawn a `.cmd` directly) |
+| Running a CLI | Spawned directly | `.exe` spawned directly; an npm `.cmd` shim is read and its target run directly (`node <package>\cli.js`, or the package's `.exe`); any other `.cmd`/`.bat` through `cmd.exe`, with every argument escaped for it, refusing a multi-line argument (Node refuses to spawn a `.cmd` directly) |
 | Stopping a CLI or command | `SIGTERM`/`SIGKILL` to the process group | `taskkill /t /f` on the process tree, plus the MSYS process group (see below) |
 | *This Mac / This PC* computer | `/bin/bash`, the login shell's environment | Git's MSYS `bash.exe` (with `MSYSTEM` and the Git tools on `PATH`, as Git Bash's launcher sets them), the app's environment minus `TUCANO_*`, `ELECTRON_*`, `VITE_*` and `NODE_OPTIONS`; `cmd.exe` if Git isn't installed. The agent's tool description and system prompt say which shell it is |
 | Folders that can't be lent | `~/Library`, dot folders | Also `%USERPROFILE%\AppData` |
@@ -55,6 +55,10 @@ This builds `dist\tucano-win-x64.exe`, a one-click per-user NSIS installer, with
 | Install hints for missing harnesses | `curl … \| bash` in Terminal | `irm … \| iex` / `npm install -g …` in PowerShell |
 | Moving data from *agent-desk* | On first open of the installed app | Skipped: agent-desk never shipped for Windows, and the key lived in the macOS Keychain |
 | Secrets | Keychain (Electron `safeStorage`) | DPAPI (Electron `safeStorage`), no change needed |
+
+### Why npm shims don't go through `cmd.exe`
+
+Claude Code and Pi get the system prompt as an argument (`--system-prompt`), many lines long, and the flags that keep them isolated (`--no-builtin-tools`, `--offline`, `--strict-mcp-config`…) come after it. `cmd.exe` ends a command at a line break, with or without quotes or carets, so through `cmd.exe` those flags were silently dropped and the CLI ran with its own tools and config: everything Tucano governs. Pi installed with npm is always a `.cmd`, and so is Claude Code installed with `npm install -g`. npm's shims all end in `"%_prog%" "%dp0%\node_modules\…\cli.js" %*`, so `spawnable` reads the target and runs it itself, and `cmd.exe` never sees the arguments. A `.cmd` that isn't such a shim still goes through `cmd.exe`, and a multi-line argument for it is refused rather than truncated.
 
 ### Why Git Bash runs without its launcher, and the MSYS process group
 
@@ -72,9 +76,9 @@ The Linux computer works unchanged, including lending a Windows folder (`-v C:\U
 
 | File | What and why |
 |---|---|
-| `src/core/platform.ts` | The core's OS differences in one place. `executableNames` (`PATHEXT` names of a command, keeping only `.exe`, `.cmd`, `.bat` and `.com`, never `.js`/`.vbs`/`.py`); `pathDirs` (`PATH` split on `;`, whatever its spelling); `spawnable` (how to spawn a CLI: `.cmd`/`.bat` through `cmd.exe /d /s /c` with cross-spawn's escaping, doubled for npm shims); `killTree` (process group on POSIX; `taskkill /t /f` plus the MSYS process group on Windows); `gitRoot` (finds Git for Windows from `CLAUDE_CODE_GIT_BASH_PATH`, `PATH` or the usual install folders, never WSL's bash); `shellCommand` (the shell for an agent's command and the environment it needs); `chromePath` (Chrome's location per OS) |
+| `src/core/platform.ts` | The core's OS differences in one place. `executableNames` (`PATHEXT` names of a command, keeping only `.exe`, `.cmd`, `.bat` and `.com`, never `.js`/`.vbs`/`.py`); `pathDirs` (`PATH` split on `;`, whatever its spelling); `spawnable` (how to spawn a CLI: an npm/pnpm/yarn `.cmd` shim runs its target directly, with the shim's `node.exe` or the interpreter it names on `PATH`; any other `.cmd`/`.bat` goes through `cmd.exe /d /s /c` with cross-spawn's doubled escaping, and refuses an argument with a line break, since `cmd.exe` would end the command there and drop every argument after it); `killTree` (process group on POSIX; `taskkill /t /f` plus the MSYS process group on Windows); `gitRoot` (finds Git for Windows from `CLAUDE_CODE_GIT_BASH_PATH`, `PATH` or the usual install folders, never WSL's bash); `shellCommand` (the shell for an agent's command and the environment it needs); `chromePath` (Chrome's location per OS) |
 | `src/shared/os.ts` | What the window and the core both need to know: `onWindows` (from `navigator.platform`, which Node and the sandboxed page both have), `mod` (`⌘` or `Ctrl+`) and `modDown` for shortcuts, `MACHINE` (`Mac` or `PC`) for the "This Mac / This PC" copy |
-| `test/platform.test.ts` | Tests for `platform.ts`. On Windows: a real npm-style `.cmd` shim receives awkward arguments intact (quotes, `&`, `%PATH%`, `^`, `( ) \| < >`, trailing backslashes, spaces, the empty string, Codex's `-c` TOML values), `PATHEXT` lookup, and Git's bash starts with the right `MSYSTEM` and `PATH`. On macOS: a CLI is spawned as is, and the shell is `/bin/bash` |
+| `test/platform.test.ts` | Tests for `platform.ts`. On Windows: a real npm-style `.cmd` shim receives awkward arguments intact (quotes, `&`, `%PATH%`, `^`, `( ) \| < >`, trailing backslashes, spaces, the empty string, Codex's `-c` TOML values); a shim in npm's exact format runs its script directly, so a multi-line argument with `&` and `%PATH%` and the flags after it all arrive; a shim for a package's `.exe` runs the `.exe`; any other script refuses a multi-line argument; `PATHEXT` lookup, and Git's bash starts with the right `MSYSTEM` and `PATH`. On macOS: a CLI is spawned as is, and the shell is `/bin/bash` |
 | `.gitattributes` | LF for every text file regardless of `core.autocrlf`. A Windows checkout with CRLF breaks `install.sh` and `scripts/*.sh` in bash and makes diffs noisy |
 | `docs/windows.md` | This document |
 
@@ -83,7 +87,7 @@ The Linux computer works unchanged, including lending a Windows folder (`-v C:\U
 | File | Change | Why |
 |---|---|---|
 | `engines/detect.ts` | `adoptLoginShellPath` does nothing on Windows; `which` uses `pathDirs()` and `executableNames()`; `run` goes through `spawnable` with `windowsHide` | The login-shell trick (`$SHELL -ilc`) has no Windows equivalent and isn't needed; `PATH` is `;`-separated there; the CLIs are `claude.exe`, `codex.cmd`…; `execFile` can't run a `.cmd` |
-| `engines/cli.ts` | `runCli` spawns through `spawnable` with `windowsHide`; a stop on Windows kills the tree | An npm CLI on Windows sits behind `cmd.exe`: `child.kill()` would end only `cmd.exe` and leave the CLI running |
+| `engines/cli.ts` | `runCli` spawns through `spawnable` with `windowsHide`; a stop on Windows kills the tree | A CLI may still sit behind `cmd.exe` (a `.cmd` that isn't an npm shim): `child.kill()` would end only `cmd.exe` and leave the CLI running |
 | `mac.ts` | Commands and services run through `shellCommand` and stop through `killTree`; `detached` only on POSIX (on Windows it opens a console window); `loginEnv` on Windows is the app's environment without its own variables, with `HOME` added; `~\` paths resolve to the home folder; the `bash` tool's description names the Windows shell; a service's log tail splits on `\r?\n` | `/bin/bash`, negative-pid process groups and a login shell don't exist on Windows; the model has to know it is in Git Bash or `cmd.exe`, not macOS |
 | `context.ts` | When the agent's computer is this PC, the system prompt's "Your computer" intro says Windows and which shell (`C:\Users` is `/c/Users` in Git Bash) | Same reason: the model writes the commands |
 | `computer.ts` | `checkFolder` also refuses `AppData`; on Windows `keep` resolves a container path with `readlink -f` before `docker cp` | `AppData` is Windows' `Library` (settings, credentials). The `docker cp -L` bug is described above |

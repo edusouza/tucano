@@ -2,7 +2,7 @@
 // spawned, which shell runs an agent's commands, and how a process tree stops.
 // Everything else in the core is written once, for both.
 import { execFile, spawn } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { delimiter, dirname, join } from 'node:path'
 
 export const isWin = process.platform === 'win32'
@@ -28,12 +28,45 @@ function cmdArg(arg: string, twice: boolean): string {
   return twice ? a.replace(META, '^$1') : a
 }
 
+// The program on PATH with this name, as cmd.exe would find it.
+function onPath(cmd: string): string | undefined {
+  for (const dir of pathDirs()) for (const name of executableNames(cmd)) if (existsSync(join(dir, name))) return join(dir, name)
+  return undefined
+}
+
+// What an npm shim runs. npm (and pnpm, yarn) write a .cmd that ends in
+// `"%_prog%" "%dp0%\node_modules\…\cli.js" %*`: node with the package's script,
+// or the package's own .exe. Run that directly, and cmd.exe never sees the arguments.
+function shimTarget(shim: string): { file: string; args: string[] } | undefined {
+  let text: string
+  try {
+    text = readFileSync(shim, 'utf8')
+  } catch {
+    return undefined
+  }
+  const target = [...text.matchAll(/"%~?dp0%?\\([^"%]+)"\s+%\*/g)].at(-1)?.[1]
+  if (!target) return undefined
+  const dir = dirname(shim)
+  const file = join(dir, target)
+  if (!existsSync(file)) return undefined
+  if (/\.(exe|com)$/i.test(file)) return { file, args: [] }
+  // The interpreter the shim would use: its own node.exe, else the one its shebang named (node, bun…) on PATH.
+  const named = /SET "_prog=([\w.-]+)"/i.exec(text)?.[1] ?? 'node'
+  const prog = existsSync(join(dir, 'node.exe')) ? join(dir, 'node.exe') : onPath(named.replace(/\.exe$/i, ''))
+  return prog ? { file: prog, args: [file] } : undefined
+}
+
 // How to spawn `bin args`. Node won't spawn a .cmd or .bat directly on Windows
-// (npm installs codex, opencode and pi that way), so those go through cmd.exe,
-// with each argument escaped for it; the shim parses its arguments a second
-// time, hence the double escaping.
+// (npm installs codex, opencode and pi that way). An npm shim runs its target
+// directly. Any other script goes through cmd.exe, with each argument escaped
+// for it (the script parses them a second time, hence the double escaping);
+// cmd.exe ends a command at a line break, which would drop every argument after
+// it (an engine's isolation flags), so a multi-line argument is refused there.
 export function spawnable(bin: string, args: string[]): { file: string; args: string[]; verbatim: boolean } {
   if (!isWin || !/\.(cmd|bat)$/i.test(bin)) return { file: bin, args, verbatim: false }
+  const direct = shimTarget(bin)
+  if (direct) return { file: direct.file, args: [...direct.args, ...args], verbatim: false }
+  if (args.some((a) => /[\r\n]/.test(a))) throw new Error(`${bin} is a script that cmd.exe would run, and cmd.exe can't take an argument with line breaks`)
   const line = [bin.replace(META, '^$1'), ...args.map((a) => cmdArg(a, true))].join(' ')
   return { file: process.env['ComSpec'] || 'cmd.exe', args: ['/d', '/s', '/c', `"${line}"`], verbatim: true }
 }
