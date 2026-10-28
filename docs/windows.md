@@ -139,6 +139,8 @@ The Linux computer works unchanged, including lending a Windows folder (`-v C:\U
 - One real turn with Claude Code 2.x (`claude.exe`): detected and signed in, the agent replied through the per-turn MCP gateway, receipt included.
 - The packaged app (`electron-builder --win --dir`): starts, finds its bundled sounds, has the Windows menu, and Ctrl+K opens *Go to*.
 
+And on macOS, to check nothing changed there: the same branch on GitHub Actions' `macos-latest` (macOS 26.6, Apple silicon, Node 24.21). `npm run typecheck` is clean. `npm test` reports 227 passed and 11 skipped: the Docker tests (no Docker on that runner) and the three Windows-only ones in `platform.test.ts`. `mac.test.ts` runs in full there, with the real `/bin/bash`. `electron-builder --mac --dir` packages an ad-hoc signed `Tucano.app` that passes `codesign --verify --deep --strict` and keeps running. `scripts/screens.mjs` (with `TUCANO_LOCALE=pt-BR`, since its selectors are in Portuguese) gets through 19 screens, up to the Linux computer, which needs Docker.
+
 ## Known limitations
 
 - **Closing the window quits the app.** On the Mac, the app keeps running (and its routines with it) with no window. Windows has no Dock to bring it back, and there's no tray icon yet, so `window-all-closed` quits, which also stops routines. Keep the window minimized while routines should run.
