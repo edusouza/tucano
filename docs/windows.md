@@ -76,9 +76,8 @@ The Linux computer works unchanged, including lending a Windows folder (`-v C:\U
 
 | File | What and why |
 |---|---|
-| `src/core/platform.ts` | The core's OS differences in one place. `executableNames` (`PATHEXT` names of a command, keeping only `.exe`, `.cmd`, `.bat` and `.com`, never `.js`/`.vbs`/`.py`); `pathDirs` (`PATH` split on `;`, whatever its spelling); `spawnable` (how to spawn a CLI: an npm/pnpm/yarn `.cmd` shim runs its target directly, with the shim's `node.exe` or the interpreter it names on `PATH`; any other `.cmd`/`.bat` goes through `cmd.exe /d /s /c` with cross-spawn's doubled escaping, and refuses an argument with a line break, since `cmd.exe` would end the command there and drop every argument after it); `killTree` (process group on POSIX; `taskkill /t /f` plus the MSYS process group on Windows); `gitRoot` (finds Git for Windows from `CLAUDE_CODE_GIT_BASH_PATH`, `PATH` or the usual install folders, never WSL's bash); `shellCommand` (the shell for an agent's command and the environment it needs); `chromePath` (Chrome's location per OS) |
-| `src/shared/os.ts` | What the window and the core both need to know: `onWindows` (from `navigator.platform`, which Node and the sandboxed page both have), `mod` (`⌘` or `Ctrl+`) and `modDown` for shortcuts, `MACHINE` (`Mac` or `PC`) for the "This Mac / This PC" copy |
-| `test/platform.test.ts` | Tests for `platform.ts`. On Windows: a real npm-style `.cmd` shim receives awkward arguments intact (quotes, `&`, `%PATH%`, `^`, `( ) \| < >`, trailing backslashes, spaces, the empty string, Codex's `-c` TOML values); a shim in npm's exact format runs its script directly, so a multi-line argument with `&` and `%PATH%` and the flags after it all arrive; a shim for a package's `.exe` runs the `.exe`; any other script refuses a multi-line argument; `PATHEXT` lookup, and Git's bash starts with the right `MSYSTEM` and `PATH`. On macOS: a CLI is spawned as is, and the shell is `/bin/bash` |
+| `src/core/platform.ts` | The core's OS differences in one place (the file came with the Linux support; Windows adds to it). `executableNames` (`PATHEXT` names of a command, keeping only `.exe`, `.cmd`, `.bat` and `.com`, never `.js`/`.vbs`/`.py`); `pathDirs` (`PATH` split on `;`, whatever its spelling); `spawnable` (how to spawn a CLI: an npm/pnpm/yarn `.cmd` shim runs its target directly, with the shim's `node.exe` or the interpreter it names on `PATH`; any other `.cmd`/`.bat` goes through `cmd.exe /d /s /c` with cross-spawn's doubled escaping, and refuses an argument with a line break, since `cmd.exe` would end the command there and drop every argument after it); `killTree` (process group on POSIX; `taskkill /t /f` plus the MSYS process group on Windows); `gitRoot` (finds Git for Windows from `CLAUDE_CODE_GIT_BASH_PATH`, `PATH` or the usual install folders, never WSL's bash); `shellCommand` (the shell for an agent's command and the environment it needs). `chromeCandidates` also lists Chrome's Windows folders (`Program Files`, `Program Files (x86)`, `LOCALAPPDATA`), and `userAgentPlatform` says Windows 10 |
+| `test/platform.test.ts` | Tests for `platform.ts`. On Windows: a real npm-style `.cmd` shim receives awkward arguments intact (quotes, `&`, `%PATH%`, `^`, `( ) \| < >`, trailing backslashes, spaces, the empty string, Codex's `-c` TOML values); a shim in npm's exact format runs its script directly, so a multi-line argument with `&` and `%PATH%` and the flags after it all arrive; a shim for a package's `.exe` runs the `.exe`; any other script refuses a multi-line argument; `PATHEXT` lookup, and Git's bash starts with the right `MSYSTEM` and `PATH`. On macOS and Linux: a CLI is spawned as is, and the shell is `/bin/bash`. On every system: Chrome's Windows folders and user-agent metadata. The test of the execute bit skips on Windows, which has none |
 | `.gitattributes` | LF for every text file regardless of `core.autocrlf`. A Windows checkout with CRLF breaks `install.sh` and `scripts/*.sh` in bash and makes diffs noisy |
 | `docs/windows.md` | This document |
 
@@ -87,16 +86,17 @@ The Linux computer works unchanged, including lending a Windows folder (`-v C:\U
 | File | Change | Why |
 |---|---|---|
 | `engines/detect.ts` | `adoptLoginShellPath` does nothing on Windows; `which` uses `pathDirs()` and `executableNames()`; `run` goes through `spawnable` with `windowsHide` | The login-shell trick (`$SHELL -ilc`) has no Windows equivalent and isn't needed; `PATH` is `;`-separated there; the CLIs are `claude.exe`, `codex.cmd`…; `execFile` can't run a `.cmd` |
+| `engines/opencode-v2.ts` | `opencode serve` and `opencode session …` spawn through `spawnable`; a stop on Windows kills the tree. Its process tests use a `#!/bin/sh` fake, so they skip on Windows | As in `cli.ts`: `opencode` is an npm `.cmd` on Windows |
 | `engines/cli.ts` | `runCli` spawns through `spawnable` with `windowsHide`; a stop on Windows kills the tree | A CLI may still sit behind `cmd.exe` (a `.cmd` that isn't an npm shim): `child.kill()` would end only `cmd.exe` and leave the CLI running |
 | `mac.ts` | Commands and services run through `shellCommand` and stop through `killTree`; `detached` only on POSIX (on Windows it opens a console window); `loginEnv` on Windows is the app's environment without its own variables, with `HOME` added; `~\` paths resolve to the home folder; the `bash` tool's description names the Windows shell; a service's log tail splits on `\r?\n` | `/bin/bash`, negative-pid process groups and a login shell don't exist on Windows; the model has to know it is in Git Bash or `cmd.exe`, not macOS |
-| `context.ts` | When the agent's computer is this PC, the system prompt's "Your computer" intro says Windows and which shell (`C:\Users` is `/c/Users` in Git Bash) | Same reason: the model writes the commands |
+| `context.ts` | When the agent's computer is this PC, the "Your computer" intro names Windows (`systemName()`) and which shell (`C:\Users` is `/c/Users` in Git Bash); installing system-wide names `winget` instead of `apt`/`brew` | Same reason: the model writes the commands |
 | `computer.ts` | `checkFolder` also refuses `AppData`; on Windows `keep` resolves a container path with `readlink -f` before `docker cp` | `AppData` is Windows' `Library` (settings, credentials). The `docker cp -L` bug is described above |
 | `connectors.ts` | Not Windows-specific, found while testing here: a remote connector added with OAuth whose server has no dynamic client registration (GitHub's `api.githubcopilot.com/mcp/`) now says to add it again with a token, instead of the SDK's "Incompatible auth server: does not support dynamic client registration". Test: `test/connectors.test.ts` | GitHub's OAuth only serves apps registered ahead of time, so a personal access token is the way in; the raw SDK message didn't say what to do |
-| `chrome.ts` | `CHROME` comes from `chromePath()`; headless Chrome's user-agent metadata says Windows / x86 on Windows instead of always macOS / arm | Chrome lives in `Program Files` on Windows; sites compare the client hints with the user agent string, which says Windows there |
-| `mac.ts`, `computer.ts`, `context.ts`, `team.ts` | Every message and tool description that named the user's machine says `MACHINE` (*PC* on Windows): `read_file`, `write_file`, `start_service`, `screenshot`, `show_file`, a port in use, a port not published, Docker not running, a service bound to localhost, the `AppData`/`Library` refusal, lent folders and the Linux computer's `node_modules` in the prompt, a webhook routine in the team export. The export header says "another computer" | The model was told it was on a Mac, and the person read "Mac" on a PC |
+| `chrome.ts` | Nothing: `findChrome()` and `userAgentPlatform()` in `platform.ts` answer for Windows too | Chrome lives in `Program Files` on Windows; sites compare the client hints with the user agent string, which says Windows there |
+| `mac.ts`, `computer.ts`, `context.ts`, `team.ts` | Nothing in the copy: since the Linux support every message says "this computer" and names the system with `systemName()` | The model and the person never read "Mac" on a PC |
 | `skills.ts` | A linked skill's folder uses `dirname(source)`, and its name `basename(dirname(source))` | `source.lastIndexOf('/')` / `split('/')` broke on `C:\…\SKILL.md`: the support files weren't listed and the fallback name was wrong |
 | `local-skills.ts` | Support files are listed with `/` | So the listing the model reads (`refs/a.md`) is the same on both systems; reading it back works with either separator |
-| `index.ts` | `runHelper` (`apiKeyHelper`) uses `shellCommand` on Windows; `loginEngine` on Windows writes `login.cmd` in the data folder and opens it in a new console (`start "Tucano" cmd.exe /k`), setting `HOME` and `CODEX_HOME` for Codex | `osascript` and Terminal.app don't exist; a script avoids `cmd.exe`'s quoting rules for paths with spaces |
+| `index.ts` | `runHelper` (`apiKeyHelper`) uses `shellCommand` on Windows; `loginEngine` on Windows writes `login.cmd` in the data folder and opens it in a new console (`start "Tucano" cmd.exe /k`), setting `HOME` and `CODEX_HOME` for Codex, and answers `opened: true` (`terminalCommand` has no terminal for Windows) | `osascript` and Terminal.app don't exist; a script avoids `cmd.exe`'s quoting rules for paths with spaces |
 
 ### Main process (`src/main/index.ts`)
 
@@ -104,26 +104,23 @@ The Linux computer works unchanged, including lending a Windows folder (`-v C:\U
 |---|---|
 | `app.setAppUserModelId('dev.tucano.app')` on Windows | Windows shows toast notifications only for an app with an id; it matches the installer's `appId` |
 | The agent-desk migration runs only on macOS | It calls `/usr/bin/security` and moves a macOS Keychain key; agent-desk never existed on Windows |
-| `chirp` plays the sounds on Windows through PowerShell's `Media.SoundPlayer` | `afplay` is macOS-only; this needs nothing installed |
-| On Windows the menu is File (About, Exit), Edit, View, Window | The macOS app menu's Services, Hide and Hide Others don't exist there |
+| The sound `player` on Windows is PowerShell's `Media.SoundPlayer` | `afplay` is macOS-only; this needs nothing installed |
 
 ### Window (`src/renderer`)
 
+Shortcuts (Ctrl off a Mac), their labels (`shortcut(platform, key)`), the menu and the copy ("this computer", "the system's vault") already come from the Linux support, which reads the system from `snapshot.platform` (`windows` here).
+
 | File | Change |
 |---|---|
-| `App.tsx` | Shortcuts use `modDown(e)`: Ctrl on Windows, ⌘ on the Mac. Before, they only listened for `metaKey`, the Windows key |
-| `components/Dialogs.tsx`, `components/Sidebar.tsx` | The "New channel" shortcut label shows `Ctrl+N` on Windows |
-| `components/Harness.tsx` | "Opens a console window" and "paste in PowerShell" on Windows, instead of Terminal |
-| `components/Pages.tsx`, `components/Onboarding.tsx` | The computer picker says *This PC* on Windows, along with its warning and the labels next to it ("on your PC", "Folders from your PC", "Give it the PC"), and "Open when the PC starts" |
-| `components/Onboarding.tsx`, `Pages.tsx`, `Conversation.tsx`, `Sidebar.tsx`, `Skills.tsx`, `Routines.tsx` | The rest of the copy that named the Mac says *PC* on Windows: onboarding's title, privacy note and harness lead, the "runs commands on your PC" warning and the *Your PC* chip on the agent card, the Linux computer's hint, the vault for tokens (it was "the Mac's Keychain"), the "on your PC" tag in a conversation and the sidebar, skills with scripts, webhook routines and the routine time hint. The webhook help drops the Xcode build phase on Windows; the team backup says "another computer" |
+| `components/Harness.tsx` | "Paste in PowerShell", with the Windows install command when there is one |
 | `components/Splash.tsx` | Not Windows-specific, found while running here: in dev, StrictMode runs the splash effect twice, and the second run couldn't parse the leaves' `translate(…)` after GSAP had rewritten it, which crashed the window. Each leaf's position is now kept in a `data-at` attribute the first time it's read |
-| `src/shared/types.ts` | `ENGINES[…].install` shows the Windows install commands for Claude Code (`irm https://claude.ai/install.ps1 \| iex`) and OpenCode (`npm install -g opencode-ai`) |
+| `src/shared/types.ts` | `ENGINES[…].windows`: the PowerShell install commands for Claude Code (`irm https://claude.ai/install.ps1 \| iex`) and OpenCode (`npm install -g opencode-ai`) |
 
 ### Tests (`test`)
 
 | File | Change |
 |---|---|
-| `mac.test.ts` | Platform-aware where the platform really differs: `pwd -W` in Git Bash prints `C:/…`; a Windows absolute path for the "absolute path" case; the injected environment carries Windows' `PATH` and `SystemRoot`; the service test serves with `node` (on Windows `python3` is often the Store's placeholder); the tool description and prompt checks expect *Windows* / *PC*, and on Windows no tool description or prompt line may say *Mac*; `PATH` is looked up whatever its spelling. On macOS every expectation is the same as before |
+| `mac.test.ts` | Platform-aware where the platform really differs: `pwd -W` in Git Bash prints `C:/…`; a Windows absolute path for the "absolute path" case; the injected environment carries Windows' `PATH` and `SystemRoot`; the service test serves with `node` (on Windows `python3` is often the Store's placeholder); on Windows no tool description or prompt line may say *Mac*, and the prompt names Git Bash or `cmd.exe`; `PATH` is looked up whatever its spelling. On macOS every expectation is the same as before |
 | `engines.test.ts` | `CODEX_HOME` is compared with `join(…)` instead of a hard-coded `/` path |
 | `computer.test.ts` | The `.venv` existence stub matches with `join(…)` |
 
@@ -133,7 +130,7 @@ The Linux computer works unchanged, including lending a Windows folder (`-v C:\U
 |---|---|
 | `package.json` | `build.win` (NSIS, `build/icon.png`, `tucano-win-${arch}.${ext}`), `build.nsis` (one-click, per user) and the `dist:win` script |
 | `README.md`, `README.pt-BR.md` | A `npm run dist:win` row, and a "On Windows?" note pointing here |
-| `CONTRIBUTING.md` | Windows in Setup (and its dev data folder), and a convention: OS differences live in `platform.ts`/`os.ts`, paths go through `path`, commands through `spawnable`/`shellCommand` |
+| `CONTRIBUTING.md` | Windows in Setup (and its dev data folder), and a convention: OS differences live in `platform.ts`, paths go through `path`, commands through `spawnable`/`shellCommand` |
 
 ## What was verified, on Windows 10 (19045), Node 24.20, Electron 44.8
 

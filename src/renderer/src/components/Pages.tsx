@@ -1,5 +1,4 @@
 import { L, locale, type Lang } from '../../../shared/lang'
-import { MACHINE } from '../../../shared/os'
 import { useEffect, useState, type ReactNode } from 'react'
 import {
   agentById,
@@ -58,6 +57,7 @@ import {
 import { HarnessList, HarnessMcps, ModelPicker, onGateway, OutsideGateway } from './Harness'
 import { ApprovalCard } from './Conversation'
 import { AgentAvatar, Icon, SleepingToucan, time, tokens, UsageBar } from './ui'
+import { UpdateSettings } from './Update'
 
 export function Page({ title, subtitle, actions, children }: { title: ReactNode; subtitle?: ReactNode; actions?: ReactNode; children: ReactNode }): ReactNode {
   return (
@@ -602,7 +602,7 @@ type ComputerChoice = 'none' | 'linux' | 'mac'
 const COMPUTER_CHOICES = (): { value: ComputerChoice; label: string }[] => [
   { value: 'none', label: L('Nenhum', 'None') },
   { value: 'linux', label: L('Linux isolado', 'Isolated Linux') },
-  { value: 'mac', label: L(`Este ${MACHINE}`, `This ${MACHINE}`) }
+  { value: 'mac', label: L('Este computador', 'This computer') }
 ]
 
 function ComputerCard({ agentId, kind, onChange }: { agentId: string; kind: ComputerChoice; onChange: (k: ComputerChoice) => void }): ReactNode {
@@ -618,8 +618,8 @@ function ComputerCard({ agentId, kind, onChange }: { agentId: string; kind: Comp
     <Card
       title={L('Computador', 'Computer')}
       lead={L(
-        `Onde ele roda comandos, instala, cria e testa. O Linux é uma máquina só dele, isolada do seu ${MACHINE} e sem credenciais. No seu ${MACHINE}, ele usa o que você já tem instalado, mas alcança tudo o que você alcança.`,
-        `Where it runs commands, installs, builds and tests. Linux is a machine of its own, isolated from your ${MACHINE} and with no credentials. On your ${MACHINE}, it uses what you already have installed, but reaches everything you can.`
+        'Onde ele roda comandos, instala, cria e testa. O Linux é uma máquina só dele, isolada do seu computador e sem credenciais. Neste computador, ele usa o que você já tem instalado, mas alcança tudo o que você alcança.',
+        'Where it runs commands, installs, builds and tests. Linux is a machine of its own, isolated from your computer and with no credentials. On this computer, it uses what you already have installed, but reaches everything you can.'
       )}
     >
       <div className="segmented segmented--wide" role="radiogroup" aria-label={L('Computador', 'Computer')}>
@@ -643,7 +643,7 @@ function ComputerCard({ agentId, kind, onChange }: { agentId: string; kind: Comp
       {confirmMac && kind !== 'mac' && (
         <div className="mac-confirm">
           <p>
-            <strong>{L(`Os comandos dele vão rodar direto no seu ${MACHINE}, como você.`, `Its commands will run right on your ${MACHINE}, as you.`)}</strong>{' '}
+            <strong>{L('Os comandos dele vão rodar direto no seu computador, como você.', 'Its commands will run right on your computer, as you.')}</strong>{' '}
             {L(
               'Ele passa a alcançar seus arquivos, seus outros projetos, as credenciais que estiverem no disco (tokens, ~/.ssh) e as contas em que o terminal está logado. Uma página da web ou um arquivo com instruções escondidas pode tentar usar isso.',
               'It can reach your files, your other projects, credentials on disk (tokens, ~/.ssh) and the accounts the terminal is signed in to. A web page or a file with hidden instructions may try to use that.'
@@ -657,7 +657,7 @@ function ComputerCard({ agentId, kind, onChange }: { agentId: string; kind: Comp
           </p>
           <div className="row">
             <button className="btn btn--sm btn--danger" onClick={() => (setConfirmMac(false), onChange('mac'))}>
-              {L(`Liberar o ${MACHINE} pra ele`, `Give it the ${MACHINE}`)}
+              {L('Liberar o computador pra ele', 'Give it this computer')}
             </button>
             <button className="btn btn--sm btn--ghost" onClick={() => setConfirmMac(false)}>
               {L('Cancelar', 'Cancel')}
@@ -668,7 +668,7 @@ function ComputerCard({ agentId, kind, onChange }: { agentId: string; kind: Comp
       {kind === 'mac' && (
         <>
           <div className="computer">
-            <span className="tag tag--warn">{L(`no seu ${MACHINE}`, `on your ${MACHINE}`)}</span>
+            <span className="tag tag--warn">{L('no seu computador', 'on your computer')}</span>
             <span className="muted small grow">{L('Os comandos começam na pasta dele.', 'Commands start in its folder.')}</span>
           </div>
           <Services agentId={agentId} />
@@ -763,12 +763,12 @@ function Services({ agentId }: { agentId: string }): ReactNode {
 function LentFolders({ agentId }: { agentId: string }): ReactNode {
   const folders = useStore((s) => agentById(s, agentId)?.folders ?? [])
   const [error, setError] = useState<string | null>(null)
-  const home = useStore((s) => s.computers.find((c) => c.agentId === agentId)?.folder.match(/^\/Users\/[^/]+/)?.[0])
+  const home = useStore((s) => s.computers.find((c) => c.agentId === agentId)?.folder.match(/^\/(?:Users|home)\/[^/]+/)?.[0])
   const short = (p: string): string => (home && p.startsWith(home) ? `~${p.slice(home.length)}` : p)
   return (
     <div className="folders">
       <div className="row row--between">
-        <strong className="small">{L(`Pastas do seu ${MACHINE}`, `Folders from your ${MACHINE}`)}</strong>
+        <strong className="small">{L('Pastas do seu computador', 'Folders from your computer')}</strong>
         <button className="btn btn--sm" onClick={() => void lendFolder(agentId).then(setError)}>
           {L('Emprestar pasta…', 'Lend a folder…')}
         </button>
@@ -1305,7 +1305,7 @@ function GithubCard({ info }: { info?: { user?: string; error?: string } }): Rea
       )}
       {(error || info?.error) && <p className="note note--error">{error || info?.error}</p>}
       <p className="hint">
-        <Icon name="shield" size={13} /> {L(`O token fica no cofre do ${MACHINE} e nunca entra no computador dos agentes. main e as outras branches são recusadas no caminho.`, `The token stays in the ${MACHINE}’s vault and never enters the agents’ computer. main and the other branches are refused on the way.`)}
+        <Icon name="shield" size={13} /> {L('O token fica no cofre do sistema e nunca entra no computador dos agentes. main e as outras branches são recusadas no caminho.', 'The token stays in the system’s vault and never enters the agents’ computer. main and the other branches are refused on the way.')}
       </p>
     </Card>
   )
@@ -1414,7 +1414,7 @@ function PhoneCard({ info }: { info?: TelegramInfo }): ReactNode {
       )}
       {(error || info?.error) && <p className="note note--error">{error || L(`O Telegram não está respondendo: ${info?.error}`, `Telegram isn't responding: ${info?.error}`)}</p>}
       <p className="hint">
-        <Icon name="shield" size={13} /> {L(`O Telegram recebe o texto das aprovações e perguntas (ferramenta, argumentos, motivo). O token fica no cofre do ${MACHINE}. Uma ação de alto risco pede dois toques.`, `Telegram receives the text of approvals and questions (tool, arguments, reason). The token stays in the ${MACHINE}’s vault. A high-risk action takes two taps.`)}
+        <Icon name="shield" size={13} /> {L('O Telegram recebe o texto das aprovações e perguntas (ferramenta, argumentos, motivo). O token fica no cofre do sistema. Uma ação de alto risco pede dois toques.', 'Telegram receives the text of approvals and questions (tool, arguments, reason). The token stays in the system’s vault. A high-risk action takes two taps.')}
       </p>
     </Card>
   )
@@ -1442,7 +1442,7 @@ export function JevKey({ saved, hint }: { saved: boolean; hint?: string }): Reac
       {saved ? (
         <div className="row">
           <span className="tag tag--ok">{L('Chave salva', 'Key saved')}</span>
-          <span className="muted small grow">{L(`Guardada no cofre do ${MACHINE}.`, `Kept in the ${MACHINE}’s vault.`)}</span>
+          <span className="muted small grow">{L('Guardada no cofre do sistema.', 'Kept in the system’s vault.')}</span>
           <button className="btn btn--sm btn--ghost" disabled={busy} onClick={() => save(null)}>
             {L('Remover chave', 'Remove key')}
           </button>
@@ -1497,6 +1497,12 @@ export function SettingsPage(): ReactNode {
                 </button>
               )}
             </div>
+          </Card>
+        )}
+
+        {pane('geral') && (
+          <Card title={L('Atualizações', 'Updates')}>
+            <UpdateSettings />
           </Card>
         )}
 
@@ -1574,7 +1580,7 @@ export function SettingsPage(): ReactNode {
             <div className="key-row">
               <Icon name="clock" />
               <div className="grow">
-                <strong>{L(`Abrir ao ligar o ${MACHINE}`, `Open when the ${MACHINE} starts`)}</strong>
+                <strong>{L('Abrir ao ligar o computador', 'Open when the computer starts')}</strong>
                 <p className="muted small">{packaged ? L('Assim nenhuma rotina depende de você lembrar de abrir o app.', 'So no routine depends on you remembering to open the app.') : L('Só no app instalado. Rodando com npm run dev, fica desligado.', 'Only in the installed app. Running with npm run dev, it stays off.')}</p>
               </div>
               <Toggle on={!!settings.openAtLogin && packaged} onChange={(v) => packaged && updateSettings({ openAtLogin: v })} />

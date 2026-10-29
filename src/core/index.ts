@@ -32,6 +32,7 @@ import { backup, backupIfDue, exportTeam, importTeam } from './team'
 import { Telegram } from './telegram'
 import { mainCipher, plainCipher, Secrets } from './secrets'
 import { Browser, type BrowserHost } from './browser'
+import { isWin, loginShell, onPath, osOf, shellCommand, terminalCommand } from './platform'
 import { ChromeBrowsers, hasChrome } from './chrome'
 import { checkFolder, Computers, folderName, type Shooter } from './computer'
 import { Memories } from './memory'
@@ -41,7 +42,6 @@ import { Routines } from './routines'
 import { Runner } from './runs'
 import { agentFromDraft, availableModels, tucaAgent, tucaHello } from './tuca'
 import { seed } from './seed'
-import { isWin, shellCommand } from './platform'
 
 const dataDir = process.env['TUCANO_DATA'] ?? join(process.cwd(), '.tucano')
 const fake = process.env['TUCANO_FAKE_ENGINES'] === '1'
@@ -104,14 +104,14 @@ const engineImpls: Record<EngineId, Engine> = fake
   : {
       claude: claudeEngine(() => engines.claude.path, async () => quietClaude(userProvider())),
       codex: codexEngine(() => engines.codex.path, codexHome, loginEnv, async () => quietCodex(userCodexProvider())),
-      opencode: opencodeEngine(() => engines.opencode.path, join(dataDir, 'opencode-home'), loginEnv),
+      opencode: opencodeEngine(() => engines.opencode.path, join(dataDir, 'opencode-home'), loginEnv, () => engines.opencode.version),
       pi: piEngine(() => engines.pi.path, join(dataDir, 'pi'), loginEnv)
     }
 
 // A command in the login shell, where SSO tools live; what it prints, trimmed.
 // Windows has no login shell: the same shell agents' commands use (Git Bash, or cmd.exe).
 const runHelper = (cmd: string): Promise<string | undefined> => {
-  const sh = isWin ? shellCommand(cmd) : { file: process.env['SHELL'] || '/bin/zsh', args: ['-lc', cmd], verbatim: false, env: process.env }
+  const sh = isWin ? shellCommand(cmd) : { file: loginShell(), args: ['-lc', cmd], verbatim: false, env: process.env }
   return new Promise((resolve) => execFile(sh.file, sh.args, { timeout: 30_000, env: sh.env, windowsHide: true, windowsVerbatimArguments: sh.verbatim }, (err, out) => resolve(err ? undefined : String(out).trim() || undefined)))
 }
 
@@ -475,6 +475,7 @@ const api: Api = {
     browsers: browser.list(),
     routines: db.routines(),
     skills: db.skills(),
+    platform: osOf(),
     packaged: process.env['TUCANO_PACKAGED'] === '1',
     demoServer: existsSync(demoPath) ? { command: 'node', args: [demoPath] } : undefined
   }),
@@ -759,11 +760,14 @@ const api: Api = {
       const env = engine === 'codex' ? `set "HOME=${codexHome}"\r\nset "CODEX_HOME=${join(codexHome, '.codex')}"\r\n` : ''
       writeFileSync(script, `@echo off\r\n${env}call "${bin}" ${sub}\r\n`)
       spawn(process.env['ComSpec'] || 'cmd.exe', ['/d', '/c', 'start', '"Tucano"', 'cmd.exe', '/k', `"${script}"`], { detached: true, stdio: 'ignore', windowsVerbatimArguments: true }).unref()
-      return
+      return { opened: true, command: `"${bin}" ${sub}` }
     }
     const q = (s: string): string => `'${s.replace(/'/g, `'\\''`)}'`
     const cmd = engine === 'codex' ? `HOME=${q(codexHome)} CODEX_HOME=${q(join(codexHome, '.codex'))} ${q(bin)} ${sub}` : `${q(bin)} ${sub}`
-    execFile('osascript', ['-e', 'tell application "Terminal" to activate', '-e', `tell application "Terminal" to do script ${JSON.stringify(cmd)}`])
+    const term = terminalCommand(cmd, osOf(), onPath)
+    // Its own process, so the terminal outlives the app if the person quits it mid-login.
+    if (term) spawn(term.bin, term.args, { detached: true, stdio: 'ignore' }).on('error', () => {}).unref()
+    return { opened: !!term, command: cmd }
   }
 }
 

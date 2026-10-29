@@ -1,6 +1,5 @@
 // Domain types shared by the core (utility process) and the renderer.
 import { L, lang, type Lang } from './lang'
-import { onWindows } from './os'
 
 export type AgentColor = 'sky' | 'indigo' | 'violet' | 'rose' | 'amber' | 'green' | 'teal' | 'graphite'
 export type GrantLevel = 'none' | 'read' | 'read_write'
@@ -14,6 +13,22 @@ export interface Model {
   engine: EngineId
   label: string
   hint: string
+}
+
+// The system the app runs on (src/core/platform.ts).
+export type Os = 'mac' | 'linux' | 'windows'
+
+// Shortcuts use ⌘ on a Mac and Ctrl elsewhere, shown the way each system writes them.
+export const shortcut = (os: Os, key: string): string => (os === 'mac' ? `⌘${key}` : `Ctrl+${key}`)
+
+// The app's own updates (src/main/updates.ts): off when run from the code.
+export interface UpdateState {
+  version: string // the one running
+  status: 'off' | 'idle' | 'checking' | 'latest' | 'downloading' | 'ready' | 'error'
+  next?: string // the newer version, while it downloads and once it's ready
+  percent?: number
+  checkedAt?: number
+  error?: string
 }
 
 export interface EngineStatus {
@@ -265,13 +280,18 @@ export const CACHE_READ_WEIGHT = 0.1
 export const countedTokens = (u: { inputTokens: number; cacheReadTokens: number; outputTokens: number }): number =>
   Math.round(u.inputTokens - u.cacheReadTokens * (1 - CACHE_READ_WEIGHT) + u.outputTokens)
 
-export const ENGINES: Record<EngineId, { label: string; cli: string; login: string; install: string; site: string }> = {
-  claude: { label: 'Claude Code', cli: 'claude', login: 'claude auth login', install: onWindows ? 'irm https://claude.ai/install.ps1 | iex' : 'curl -fsSL https://claude.ai/install.sh | bash', site: 'https://code.claude.com' },
+// `windows`: the install command for PowerShell, where the POSIX one doesn't run.
+export const ENGINES: Record<EngineId, { label: string; cli: string; login: string; install: string; windows?: string; site: string }> = {
+  claude: { label: 'Claude Code', cli: 'claude', login: 'claude auth login', install: 'curl -fsSL https://claude.ai/install.sh | bash', windows: 'irm https://claude.ai/install.ps1 | iex', site: 'https://code.claude.com' },
   codex: { label: 'Codex', cli: 'codex', login: 'codex login', install: 'npm install -g @openai/codex', site: 'https://github.com/openai/codex' },
-  opencode: { label: 'OpenCode', cli: 'opencode', login: 'opencode auth login', install: onWindows ? 'npm install -g opencode-ai' : 'curl -fsSL https://opencode.ai/install | bash', site: 'https://opencode.ai' },
+  opencode: { label: 'OpenCode', cli: 'opencode', login: 'opencode auth login', install: 'curl -fsSL https://opencode.ai/install | bash', windows: 'npm install -g opencode-ai', site: 'https://opencode.ai' },
   pi: { label: 'Pi', cli: 'pi', login: 'pi', install: 'npm install -g @earendil-works/pi-coding-agent', site: 'https://pi.dev' }
 }
 export const ENGINE_IDS = Object.keys(ENGINES) as EngineId[]
+
+// A harness starts picked only when it can actually run: one not installed or not
+// signed in yet starts off.
+export const startsPicked = (st: EngineStatus): boolean => !st.soon && st.loggedIn
 
 // Hints and labels read the language when shown (getters), so a list made once still switches.
 const model = (id: string, engine: EngineId, label: string, pt: string, en: string): Model => ({

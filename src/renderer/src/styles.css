@@ -276,6 +276,10 @@ h3 {
   flex: none;
   -webkit-app-region: drag;
 }
+/* Off a Mac the system draws the title bar: no room to keep for the window buttons. */
+:root:not([data-os='mac']) .sidebar__drag {
+  height: 10px;
+}
 .workspace {
   display: flex;
   align-items: center;
@@ -6191,4 +6195,31 @@ kbd {
 }
 .cal-nav button:disabled:hover {
   background: none;
+}
+
+/* ---------- a new version, ready to go in ---------- */
+.update-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 8px 8px 8px 10px;
+  border-radius: 8px;
+  background: var(--accent-soft);
+}
+.update-note__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  font-size: 12.5px;
+  line-height: 1.35;
+}
+.update-note__text a {
+  color: var(--accent);
+  font-size: 12px;
+  text-decoration: none;
+}
+.update-note__text a:hover {
+  text-decoration: underline;
 }

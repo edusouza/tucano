@@ -1,5 +1,4 @@
 import { L } from '../../../shared/lang'
-import { MACHINE, mod } from '../../../shared/os'
 import { useCallback, useState, type ReactNode } from 'react'
 import {
   agentById,
@@ -13,12 +12,14 @@ import {
   openDm,
   pendingApprovals,
   pendingMemories,
+  shortcut,
   updateSettings,
   useStore,
   type View
 } from '../store'
 import { ContextMenu, type MenuItem, type MenuState } from './Dialogs'
 import { GettingStarted } from './Onboarding'
+import { UpdateNote } from './Update'
 import { AgentAvatar, Icon, TucaMark, type IconName } from './ui'
 
 const same = (a: View | null, b: View): boolean => JSON.stringify(a) === JSON.stringify(b)
@@ -141,7 +142,7 @@ export function Sidebar(): ReactNode {
         <div className="section">
           <div className="section__head">
             <span>{L('Canais', 'Channels')}</span>
-            <button className="icon-btn icon-btn--sm" title={L(`Novo canal (${mod}N)`, `New channel (${mod}N)`)} onClick={() => openDialog({ kind: 'new-channel' })}>
+            <button className="icon-btn icon-btn--sm" title={L(`Novo canal (${shortcut(s.platform, 'N')})`, `New channel (${shortcut(s.platform, 'N')})`)} onClick={() => openDialog({ kind: 'new-channel' })}>
               <Icon name="plus" size={14} />
             </button>
           </div>
@@ -196,6 +197,7 @@ export function Sidebar(): ReactNode {
       {s.settings.onboarding?.done && !s.settings.onboarding.checklistHidden && <GettingStarted />}
       <ContextMenu menu={menu} onClose={closeMenu} />
       <div className="sidebar__foot">
+        <UpdateNote />
         <NavItem view={{ kind: 'usage' }} icon="chart" label={L('Uso e limites', 'Usage and limits')} />
         <NavItem view={{ kind: 'connectors' }} icon="plug" label={L('Conectores', 'Connectors')} />
         <NavItem view={{ kind: 'settings' }} icon="gear" label={L('Configurações', 'Settings')} />
@@ -239,7 +241,7 @@ function AgentItem({ id }: { id: string }): ReactNode {
       <span className="nav-item__label">{agent.name}</span>
       {working ? <span className="pulse" title={L('Trabalhando', 'Working')} /> : <span className="nav-item__meta">{agent.role}</span>}
       {agent.computer && agent.computerKind === 'mac' && (
-        <span className="nav-item__mac" title={L(`Roda no seu ${MACHINE}`, `Runs on your ${MACHINE}`)}>
+        <span className="nav-item__mac" title={L('Roda no seu computador', 'Runs on your computer')}>
           <Icon name="laptop" size={13} />
         </span>
       )}

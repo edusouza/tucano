@@ -9,11 +9,12 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, readlinkSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { L } from '../shared/lang'
+import { findChrome, userAgentPlatform } from './platform'
 import { POINT, PICK, SNAPSHOT, TEXT } from '../shared/page'
 import type { BrowserOp, BrowserReply } from '../shared/types'
-import { chromePath, isWin } from './platform'
 
-export const CHROME = chromePath()
+// Google Chrome on this computer, where it usually is on each system (see platform.ts).
+export const CHROME = findChrome()
 
 const W = 1280
 const H = 800
@@ -148,10 +149,7 @@ class Tab {
         userAgentMetadata: {
           brands: [{ brand: 'Google Chrome', version }, { brand: 'Chromium', version }, { brand: 'Not(A:Brand', version: '24' }],
           fullVersion: /Chrome\/([\d.]+)/.exec(userAgent)?.[1] ?? version,
-          // The same system as the user agent string, or sites see a mismatch.
-          platform: isWin ? 'Windows' : 'macOS',
-          platformVersion: isWin ? '10.0.0' : '15.0.0',
-          architecture: isWin ? 'x86' : 'arm',
+          ...userAgentPlatform(),
           model: '',
           mobile: false
         }
@@ -200,7 +198,7 @@ export class ChromeBrowsers {
   constructor(
     private dir: string, // profiles live in <dir>/<agentId>
     private onShown: (agentId: string, shown: boolean) => void,
-    private bin = CHROME,
+    private bin: string = CHROME ?? '',
     private onFrame?: OnFrame
   ) {
     process.on('exit', () => this.quit())
@@ -437,4 +435,4 @@ export class ChromeBrowsers {
   }
 }
 
-export const hasChrome = (bin = CHROME): boolean => existsSync(bin)
+export const hasChrome = (bin = CHROME): boolean => !!bin && existsSync(bin)

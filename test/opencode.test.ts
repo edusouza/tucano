@@ -36,11 +36,34 @@ describe('opencode', () => {
     expect(opencodeArgs({ model: 'openai/gpt-5.6-luna' })).toEqual(['run', '--pure', '--format', 'json', '--agent', 'tucano', '-m', 'openai/gpt-5.6-luna'])
   })
 
+  it('accumulates the cost V2 reports per step', () => {
+    const p = opencodeParser()
+    const withCost = '{"type":"step_finish","part":{"type":"step-finish","reason":"tool-calls","cost":0.0005,"tokens":{"total":222,"input":204,"output":18,"reasoning":0,"cache":{"write":0,"read":0}}}}'
+    p.line(withCost)
+    const [done] = p.end(0, '')
+    expect(done).toMatchObject({ usage: { apiCostUsd: 0.0005 } })
+  })
+
+  it('still ends done when V2 emits no step_finish at all', () => {
+    const p = opencodeParser()
+    p.line(TEXT)
+    expect(p.end(0, '')).toEqual([{ type: 'done', text: 'São 13:37 no Tucano.', usage: { inputTokens: 0, cacheReadTokens: 0, outputTokens: 0 } }])
+  })
+
   it("takes only the providers from the user's opencode.jsonc", () => {
     const dir = mkdtempSync(join(tmpdir(), 'oc-'))
     mkdirSync(dir, { recursive: true })
     writeFileSync(join(dir, 'opencode.jsonc'), '{\n  // a comment\n  "provider": { "acme": { "options": { "baseURL": "https://llm.acme.com/v1" } } },\n  "mcp": { "x": {} },\n  "instructions": ["a.md"],\n}\n')
     expect(userOpencodeProviders(dir)).toEqual({ provider: { acme: { options: { baseURL: 'https://llm.acme.com/v1' } } } })
     expect(stripJsonComments('{"url": "http://x//y" /* c */}')).toBe('{"url": "http://x//y" }')
+  })
+
+  it("takes V2's providers shape too, for V2 only, and only the policies about providers", () => {
+    const dir = mkdtempSync(join(tmpdir(), 'oc-'))
+    const providers = { empresa: { package: 'aisdk:@ai-sdk/openai-compatible', settings: { baseURL: 'https://llm.acme.com/v1' } } }
+    const policies = [{ action: 'provider.use', resource: 'empresa', effect: 'allow' }, { action: 'tool.use', resource: 'shell', effect: 'allow' }]
+    writeFileSync(join(dir, 'opencode.json'), JSON.stringify({ provider: { acme: {} }, providers, policies, mcp: { servers: {} } }))
+    expect(userOpencodeProviders(dir, true)).toEqual({ provider: { acme: {} }, providers, policies: [policies[0]] })
+    expect(userOpencodeProviders(dir)).toEqual({ provider: { acme: {} } })
   })
 })

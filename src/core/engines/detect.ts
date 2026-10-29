@@ -6,6 +6,7 @@ import type { EngineId, EngineStatus } from '../../shared/types'
 import { executableNames, isWin, pathDirs, spawnable } from '../platform'
 import { userProvider } from './claude'
 import { codexEnv, userCodexProvider } from './codex'
+import { opencodeMajor } from './opencode-v2'
 
 function run(bin: string, args: string[], timeout = 15_000, env: NodeJS.ProcessEnv = process.env): Promise<{ code: number; stdout: string; stderr: string }> {
   return new Promise((resolve) => {
@@ -123,7 +124,10 @@ function listedStatus(path: string, v: string, models: string[], login: string):
 export async function detectOpenCode(): Promise<{ status: EngineStatus; models: string[] }> {
   const path = await which('opencode')
   if (!path) return { status: { installed: false, loggedIn: false }, models: [] }
-  const [v, list] = await Promise.all([run(path, ['--version']), run(path, ['models'], 30_000)])
+  const v = await run(path, ['--version'])
+  // V2's commands talk to a background service and start it when it isn't running;
+  // --standalone (V2 only) answers from a private server that ends with the command.
+  const list = await run(path, opencodeMajor(version(v.stdout)) >= 2 ? ['models', '--standalone'] : ['models'], 30_000)
   const models = list.stdout.split('\n').map((l) => l.trim()).filter((l) => /^[\w.-]+\/\S+$/.test(l))
   return { status: listedStatus(path, v.stdout, models, 'opencode auth login'), models }
 }

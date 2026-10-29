@@ -6,7 +6,6 @@ import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import { L, locale } from '../shared/lang'
-import { MACHINE } from '../shared/os'
 import { describeSchedule, modelInfo, type Agent, type AgentColor, type Effort, type GrantLevel, type Routine, type Schedule, type Trigger } from '../shared/types'
 import type { Db } from './db'
 
@@ -93,7 +92,7 @@ export function exportTeam(db: Db): string {
           L('## Rotinas', '## Routines'),
           ...data.routines.map(
             (r) =>
-              `- **${r.name}** (@${r.agent}, ${r.where === 'dm' ? L('na DM', 'in the DM') : r.where}): ${r.trigger ? (r.trigger.kind === 'poll' ? L(`quando aparece algo novo em ${r.trigger.connector} · ${r.trigger.tool}`, `when something new shows up in ${r.trigger.connector} · ${r.trigger.tool}`) : L(`quando chamada no ${MACHINE}`, `when called on the ${MACHINE}`)) : describeSchedule(r.schedule)}`
+              `- **${r.name}** (@${r.agent}, ${r.where === 'dm' ? L('na DM', 'in the DM') : r.where}): ${r.trigger ? (r.trigger.kind === 'poll' ? L(`quando aparece algo novo em ${r.trigger.connector} · ${r.trigger.tool}`, `when something new shows up in ${r.trigger.connector} · ${r.trigger.tool}`) : L('quando chamada neste computador', 'when called on this computer')) : describeSchedule(r.schedule)}`
           ),
           ''
         ]
