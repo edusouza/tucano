@@ -134,7 +134,7 @@ The first time Tucano saves a connector password, macOS asks whether it may use 
 | **⌘,** | Settings |
 | **Right-click** | On a channel: agents, rename, delete. On an agent: message, edit, archive |
 
-On Linux, use **Ctrl** instead of **⌘**. Closing the window keeps Tucano running in the tray (routines and triggers go on); quit it from the tray icon.
+On Linux and Windows, use **Ctrl** instead of **⌘**. Closing the window keeps Tucano running in the tray, by the clock (routines and triggers go on); quit it from the tray icon.
 
 - **Connect a tool:** **Connectors → Add**, paste the MCP server's address. OAuth servers open the browser; the others ask for a token. Then, on each agent's page, set its access to each connector.
 - **Archived agents** leave the sidebar and stop answering, but keep their history and receipts. Find them under **Archived** to bring them back.
@@ -228,6 +228,9 @@ You need Node 24+ and one harness signed in. `npm run dev` keeps its own data in
 | `npm run install-app` | Builds `Tucano.app` and installs it in `/Applications` |
 | `npm run release` | Builds the `.dmg` and `.zip` and publishes `package.json`'s version as a GitHub release (`-- --no-publish` only builds) |
 | `node scripts/screens.mjs <folder>` | Opens the build with Playwright on a temporary database and saves screenshots |
+| `npm run dist:win` | On Windows: builds the installer, `dist/tucano-win-x64.exe` (not code-signed) |
+
+**On Windows?** Tucano runs on Windows 10/11 too, in development and as an installer. You'll also want Git for Windows, whose Git Bash runs agents' commands on your PC. See [docs/windows.md](docs/windows.md) for what you need, how it differs from the Mac, and every change made for it.
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. The original design document, in Portuguese, is in [docs/spec-mvp.md](docs/spec-mvp.md).
 

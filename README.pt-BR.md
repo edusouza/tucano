@@ -134,7 +134,7 @@ Na primeira vez que o Tucano guardar uma senha de conector, o macOS pergunta se 
 | **⌘,** | Configurações |
 | **Botão direito** | Num canal: agentes, renomear, excluir. Num agente: mensagem, editar, arquivar |
 
-No Linux, use **Ctrl** no lugar do **⌘**. Fechar a janela deixa o Tucano rodando na bandeja do sistema (rotinas e gatilhos continuam); pra encerrar, use o ícone da bandeja.
+No Linux e no Windows, use **Ctrl** no lugar do **⌘**. Fechar a janela deixa o Tucano rodando na bandeja do sistema, perto do relógio (rotinas e gatilhos continuam); pra encerrar, use o ícone da bandeja.
 
 - **Conectar uma ferramenta:** **Conectores → Adicionar**, cole o endereço do servidor MCP. Os com OAuth abrem o navegador; os outros pedem um token. Depois, na página de cada agente, escolha o acesso dele a cada conector.
 - **Agentes arquivados** saem da barra lateral e param de responder, mas o histórico e os recibos ficam. Eles aparecem em **Arquivados**, pra reativar.
@@ -228,6 +228,9 @@ Precisa do Node 24+ e de um harness logado. O `npm run dev` guarda os dados em `
 | `npm run install-app` | Gera o `Tucano.app` e instala em `/Applications` |
 | `npm run release` | Gera o `.dmg` e o `.zip` e publica a versão do `package.json` como release no GitHub (`-- --no-publish` só gera) |
 | `node scripts/screens.mjs <pasta>` | Abre o build com Playwright num banco temporário e salva screenshots |
+| `npm run dist:win` | No Windows: gera o instalador, `dist/tucano-win-x64.exe` (sem assinatura de código) |
+
+**No Windows?** O Tucano roda no Windows 10/11 também, em desenvolvimento e como instalador. Você vai querer também o Git for Windows, cujo Git Bash roda os comandos dos agentes no seu PC. O [docs/windows.md](docs/windows.md) (em inglês) diz o que precisa, o que muda em relação ao Mac e todas as mudanças feitas pra isso.
 
 Leia o [CONTRIBUTING.md](CONTRIBUTING.md) antes de abrir um pull request (o código, os comentários e os commits são em inglês). O documento de design original está em [docs/spec-mvp.md](docs/spec-mvp.md).
 
