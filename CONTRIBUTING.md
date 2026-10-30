@@ -41,7 +41,7 @@ For UI changes, attach a screenshot to the pull request. `node scripts/screens.m
 
 ```
 src/
-  main/       Electron main process: the window, notifications, the agents' browsers, the system's vault, the Linux tray
+  main/       Electron main process: the window, notifications, the agents' browsers, the system's vault, the tray (Linux, Windows)
   core/       Utility process: SQLite, harnesses, runs, the MCP gateway, connectors, memory, routines
               (platform.ts holds what differs between macOS and Linux: ask it, don't check the platform)
   renderer/   React UI, talking to the core over a MessagePort

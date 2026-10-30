@@ -55,6 +55,7 @@ This builds `dist\tucano-win-x64.exe`, a one-click per-user NSIS installer, with
 | Install hints for missing harnesses | `curl … \| bash` in Terminal | `irm … \| iex` / `npm install -g …` in PowerShell |
 | Moving data from *agent-desk* | On first open of the installed app | Skipped: agent-desk never shipped for Windows, and the key lived in the macOS Keychain |
 | Secrets | Keychain (Electron `safeStorage`) | DPAPI (Electron `safeStorage`), no change needed |
+| Closing the window | The app stays in the Dock; routines go on | The app stays in the tray, by the clock, as on Linux; routines go on, a notification says so once, and the tray icon reopens the window or quits |
 
 ### Why npm shims don't go through `cmd.exe`
 
@@ -144,7 +145,6 @@ And on macOS, to check nothing changed there: the same branch on GitHub Actions'
 
 ## Known limitations
 
-- **Closing the window quits the app.** On the Mac, the app keeps running (and its routines with it) with no window. Windows has no Dock to bring it back, and there's no tray icon yet, so `window-all-closed` quits, which also stops routines. Keep the window minimized while routines should run.
 - **Not code-signed.** SmartScreen warns on the first open of the installer.
 - **Two macOS-only dialogs** in `src/main/index.ts` (⌘Q, the macOS Keychain) still name the Mac: they belong to the agent-desk migration, which never runs on Windows.
 - **Without Git for Windows**, agents on *This PC* get `cmd.exe`, and the model is told so. Claude Code itself needs Git Bash on Windows anyway.

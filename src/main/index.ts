@@ -117,15 +117,17 @@ function openAtLogin(open: boolean): void {
   }
 }
 
-// On Linux, closing the window keeps the app running (routines, triggers, Telegram),
-// as the Dock does on a Mac; the tray icon brings it back or quits it. A desktop
+// On Linux and Windows, closing the window keeps the app running (routines, triggers,
+// Telegram), as the Dock does on a Mac; the tray icon brings it back or quits it. A desktop
 // without a tray (plain GNOME) reopens it from the app menu: a second launch shows it.
 let tray: Tray | null = null
 let quitting = false
 let toldStillOpen = false
 function setTray(): void {
-  if (process.platform !== 'linux') return
-  tray ??= new Tray(nativeImage.createFromPath(resource('tray.png')).resize({ width: 22, height: 22 }))
+  if (process.platform === 'darwin') return
+  // Windows draws tray icons at 16 px (scaled up on a high-DPI screen); Linux panels at 22.
+  const size = process.platform === 'win32' ? 16 : 22
+  tray ??= new Tray(nativeImage.createFromPath(resource('tray.png')).resize({ width: size, height: size }))
   tray.setToolTip(NAME)
   tray.removeAllListeners('click')
   tray.on('click', () => showWindow())
@@ -140,12 +142,12 @@ function setTray(): void {
 // Linux shows a notification with the icon it's given (a Mac uses the app's own).
 const noteIcon = (): { icon?: string } => (process.platform === 'linux' ? { icon: resource('icon.png') } : {})
 function stillOpen(): void {
-  if (process.platform !== 'linux' || quitting || toldStillOpen || !Notification.isSupported()) return
+  if (process.platform === 'darwin' || quitting || toldStillOpen || !Notification.isSupported()) return
   toldStillOpen = true
   new Notification({
     ...noteIcon(),
     title: L(`O ${NAME} continua aberto`, `${NAME} is still open`),
-    body: L('As rotinas seguem rodando. Pra voltar, use o ícone do tucano na barra do sistema ou abra o Tucano de novo.', 'Routines keep running. To get back, use the toucan icon in the system bar or open Tucano again.'),
+    body: L('As rotinas seguem rodando. Pra voltar, use o ícone do tucano perto do relógio ou abra o Tucano de novo.', 'Routines keep running. To get back, use the toucan icon by the clock or open Tucano again.'),
     silent: true
   }).show()
 }
@@ -417,9 +419,9 @@ if (moved === 'old-app-open' || moved === 'keychain-denied') {
   })
 })
 
-// A Mac keeps the app in the Dock and Linux in the tray (see setTray); elsewhere it quits.
+// A Mac keeps the app in the Dock, Linux and Windows in the tray (see setTray); elsewhere it quits.
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin' && process.platform !== 'linux') app.quit()
+  if (!['darwin', 'linux', 'win32'].includes(process.platform)) app.quit()
 })
 
 app.on('before-quit', () => {

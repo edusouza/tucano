@@ -134,7 +134,7 @@ Na primeira vez que o Tucano guardar uma senha de conector, o macOS pergunta se 
 | **⌘,** | Configurações |
 | **Botão direito** | Num canal: agentes, renomear, excluir. Num agente: mensagem, editar, arquivar |
 
-No Linux, use **Ctrl** no lugar do **⌘**. Fechar a janela deixa o Tucano rodando na bandeja do sistema (rotinas e gatilhos continuam); pra encerrar, use o ícone da bandeja.
+No Linux e no Windows, use **Ctrl** no lugar do **⌘**. Fechar a janela deixa o Tucano rodando na bandeja do sistema, perto do relógio (rotinas e gatilhos continuam); pra encerrar, use o ícone da bandeja.
 
 - **Conectar uma ferramenta:** **Conectores → Adicionar**, cole o endereço do servidor MCP. Os com OAuth abrem o navegador; os outros pedem um token. Depois, na página de cada agente, escolha o acesso dele a cada conector.
 - **Agentes arquivados** saem da barra lateral e param de responder, mas o histórico e os recibos ficam. Eles aparecem em **Arquivados**, pra reativar.
